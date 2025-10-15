@@ -10,6 +10,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.wehangout.music-reward-app",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      },
       "buildNumber": "1"
     },
     "android": {
