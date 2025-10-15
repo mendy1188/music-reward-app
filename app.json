@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "musicrewardapp",
+    "slug": "music-reward-app",
+    "scheme": "musicrewardapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wehangout.music-reward-app",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.wehangout.musicrewardapp"
+    },
+    "extra": {}
+  }
+}
