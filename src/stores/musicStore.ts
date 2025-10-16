@@ -1,56 +1,74 @@
-// src/stores/musicStore.ts
-// Persist ONLY user progress (completedChallenges). Do NOT persist the catalog.
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MusicChallenge } from '../types';
 import { SAMPLE_CHALLENGES } from '../constants/theme';
 
+type DeductionInfo = { pointsDeducted: number; forwardSeeks: number };
+
 interface MusicStore {
-  // Ephemeral UI/catalog state (NOT persisted)
+  // Ephemeral UI/catalog state (NOT persisted directly)
   challenges: MusicChallenge[];
   currentTrack: MusicChallenge | null;
   isPlaying: boolean;
   currentPosition: number;
 
-  // Persisted user progress (IDs only)
+  // Persisted user progress (IDs) + persisted per-challenge deductions
   completedChallenges: string[];
+  // NEW: persisted deductions by challenge ID
+  deductionsById: Record<string, DeductionInfo>;
 
   // Actions
-  loadChallenges: () => void; // rebuild from SAMPLE_CHALLENGES + completed IDs
+  loadChallenges: () => void; // rebuild from SAMPLE_CHALLENGES + completed + deductions map
   setCurrentTrack: (track: MusicChallenge | null) => void;
   updateProgress: (challengeId: string, progress: number) => void;
-  markChallengeComplete: (challengeId: string) => void;
+
+  // Accept optional deduction info on complete
+  markChallengeComplete: (
+    challengeId: string,
+    opts?: { pointsDeducted?: number; forwardSeeks?: number }
+  ) => void;
+
   setIsPlaying: (playing: boolean) => void;
   setCurrentPosition: (position: number) => void;
 
-  // Dev helper
+  // Dev/helper
   resetProgress: () => Promise<void>;
 }
 
-const buildChallenges = (completedIds: string[]): MusicChallenge[] =>
-  SAMPLE_CHALLENGES.map((c) => ({
-    ...c,
-    completed: completedIds.includes(c.id),
-    progress: completedIds.includes(c.id) ? 100 : 0,
-  }));
+// Build ephemeral list from catalog + completed IDs + persisted deductions
+const buildChallenges = (
+  completedIds: string[],
+  deductionsById: Record<string, DeductionInfo>
+): MusicChallenge[] =>
+  SAMPLE_CHALLENGES.map((c) => {
+    const completed = completedIds.includes(c.id);
+    const d = deductionsById[c.id];
+    return {
+      ...c,
+      completed,
+      progress: completed ? 100 : 0,
+      pointsDeducted: d?.pointsDeducted ?? 0,
+      forwardSeeks: d?.forwardSeeks ?? 0,
+    };
+  });
 
 export const useMusicStore = create<MusicStore>()(
   persist(
     (set, get) => ({
       // Ephemeral (catalog + ui)
-      challenges: buildChallenges([]),
+      challenges: buildChallenges([], {}),
       currentTrack: null,
       isPlaying: false,
       currentPosition: 0,
 
-      // Persisted user progress
+      // Persisted slices
       completedChallenges: [],
+      deductionsById: {},
 
-      // Actions
       loadChallenges: () => {
-        const { completedChallenges } = get();
-        set({ challenges: buildChallenges(completedChallenges) });
+        const { completedChallenges, deductionsById } = get();
+        set({ challenges: buildChallenges(completedChallenges, deductionsById) });
       },
 
       setCurrentTrack: (track) => set({ currentTrack: track }),
@@ -65,14 +83,21 @@ export const useMusicStore = create<MusicStore>()(
         }));
       },
 
-      markChallengeComplete: (challengeId) => {
+      markChallengeComplete: (challengeId, opts) => {
         set((state) => {
           const already = state.completedChallenges.includes(challengeId);
           const nextCompleted = already
             ? state.completedChallenges
             : [...state.completedChallenges, challengeId];
 
-          // reflect completion in ephemeral challenges
+          // persist/merge the deduction for this challenge
+          const prevDeduction = state.deductionsById[challengeId] ?? { pointsDeducted: 0, forwardSeeks: 0 };
+          const nextDeduction: DeductionInfo = {
+            pointsDeducted: opts?.pointsDeducted ?? prevDeduction.pointsDeducted,
+            forwardSeeks: opts?.forwardSeeks ?? prevDeduction.forwardSeeks,
+          };
+
+          // reflect completion + deduction into ephemeral array
           const nextChallenges = state.challenges.map((ch) =>
             ch.id === challengeId
               ? {
@@ -80,12 +105,18 @@ export const useMusicStore = create<MusicStore>()(
                   completed: true,
                   progress: 100,
                   completedAt: new Date().toISOString(),
+                  pointsDeducted: nextDeduction.pointsDeducted,
+                  forwardSeeks: nextDeduction.forwardSeeks,
                 }
               : ch
           );
 
           return {
             completedChallenges: nextCompleted,
+            deductionsById: {
+              ...state.deductionsById,
+              [challengeId]: nextDeduction,
+            },
             challenges: nextChallenges,
           };
         });
@@ -95,27 +126,29 @@ export const useMusicStore = create<MusicStore>()(
       setCurrentPosition: (position) => set({ currentPosition: position }),
 
       resetProgress: async () => {
-        // clear only the persisted progress; rebuild challenges fresh
-        set({ completedChallenges: [] });
-        set({ challenges: buildChallenges([]) });
+        // Clear persisted progress + deductions; rebuild ephemeral list
+        set({ completedChallenges: [], deductionsById: {} });
+        set({ challenges: buildChallenges([], {}) });
       },
     }),
     {
       name: 'music-store',
       storage: createJSONStorage(() => AsyncStorage),
 
-      // ✅ Persist ONLY user progress
+      // ✅ Persist ONLY progress IDs + the small deductions map
       partialize: (state) => ({
         completedChallenges: state.completedChallenges,
+        deductionsById: state.deductionsById,
       }),
 
-      // After rehydrate, rebuild ephemeral challenges from SAMPLE + persisted progress
+      // After rehydrate, rebuild ephemeral challenges from SAMPLE + persisted progress & deductions
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         setTimeout(() => {
           const completed = state.completedChallenges ?? [];
+          const deductions = state.deductionsById ?? {};
           useMusicStore.setState({
-            challenges: buildChallenges(completed),
+            challenges: buildChallenges(completed, deductions),
           });
         }, 0);
       },

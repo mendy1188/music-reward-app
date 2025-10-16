@@ -143,7 +143,7 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
       const effectivePoints = Math.max(0, basePoints - penalty);
       // ------------------------------------
 
-      markChallengeComplete(currentTrack.id);
+      markChallengeComplete(currentTrack.id, { pointsDeducted: penalty, forwardSeeks: seeks });
       completeChallenge(currentTrack.id, effectivePoints);
     }
   }, [

@@ -41,6 +41,8 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Challenge Progress</Text>
         {challenges.map((challenge) => {
           const isCompleted = completedChallenges.includes(challenge.id);
+          const totalPointsDeducted = challenge.pointsDeducted ?? 0;
+          const totalCompletedPoints = challenge.points - totalPointsDeducted;
           return (
             <View key={challenge.id} style={styles.challengeItem}>
               <View style={styles.challengeHeader}>
@@ -61,7 +63,10 @@ export default function ProfileScreen() {
                 />
               </View>
               <Text style={styles.progressText}>
-                {Math.round(challenge.progress)}% • {challenge.points} points
+                {Math.round(challenge.progress)}% • {totalCompletedPoints} points
+                {(isCompleted && totalPointsDeducted > 0) ? (
+                  <> • {totalPointsDeducted} deducted for skips</>
+                ) : null}
               </Text>
             </View>
           );

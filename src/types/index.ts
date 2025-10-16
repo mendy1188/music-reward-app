@@ -13,6 +13,8 @@ export interface MusicChallenge {
   completed: boolean;
   progress: number; // 0-100
   completedAt?: string;
+  pointsDeducted?: number;
+  forwardSeeks?: number;
 }
 
 export interface PointsCounterConfig {

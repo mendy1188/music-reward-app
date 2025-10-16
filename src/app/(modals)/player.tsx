@@ -204,10 +204,10 @@ export default function PlayerModal() {
                 },
               ]}
             >
-              {currentTrack.completed ? '✅ Completed' : '🎧 In Progress'}
+              {(currentTrack.completed || Math.round(getProgress()) >= 90) ? '✅ Completed' : '🎧 In Progress'}
             </Text>
             <Text style={styles.challengeProgress}>
-              {Math.round(currentTrack.progress)}% of challenge complete
+              { currentTrack.completed ? Math.round(currentTrack.progress) : Math.round(getProgress())}% of challenge complete
             </Text>
           </View>
         </GlassCard>
