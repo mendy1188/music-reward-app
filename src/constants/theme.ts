@@ -76,4 +76,16 @@ export const SAMPLE_CHALLENGES = [
     completed: false,
     progress: 0,
   },
+  {
+    id: 'challenge-3',
+    title: 'Excellent',
+    artist: 'Kojo Blak',
+    duration: 149, // 2:40
+    points: 300,
+    audioUrl: require('../../assets/audio/KOJO BLAK - Excellent _ft_ Kelvyn Boy.mp3'),
+    description: 'Listen to this classic afrobeat music points',
+    difficulty: 'easy' as const,
+    completed: false,
+    progress: 0,
+  },
 ];

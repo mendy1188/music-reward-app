@@ -1,19 +1,46 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { THEME } from '../../constants/theme';
 
 type Props = {
   currentPoints: number;
-  progress: number; // 0-100
+  progress: number; //Progress percentage from 0–100
 };
 
 const PointsCounter: React.FC<Props> = ({ currentPoints, progress }) => {
+  // Animated width value (0–100)
+  const w = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const clamped = Math.min(100, Math.max(0, progress));
+    Animated.timing(w, {
+      toValue: clamped,
+      duration: 350,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false, // animating width, so must be false
+    }).start();
+  }, [progress, w]);
+
+  const widthStyle = {
+    width: w.interpolate({
+      inputRange: [0, 100],
+      outputRange: ['0%', '100%'],
+    }),
+  };
+
   return (
-    <View style={styles.container} accessibilityLabel={`Points ${currentPoints}, progress ${Math.floor(progress)} percent`}>
+    <View
+      style={styles.container}
+      accessibilityRole="progressbar"
+      accessibilityLabel="Listening progress"
+      accessibilityValue={{ now: Math.round(progress), min: 0, max: 100, text: `${Math.round(progress)}%` }}
+    >
       <Text style={styles.points}>+{currentPoints}</Text>
+
       <View style={styles.bar}>
-        <View style={[styles.fill, { width: `${Math.min(100, Math.max(0, progress))}%` }]} />
+        <Animated.View style={[styles.fill, widthStyle]} />
       </View>
+
       <Text style={styles.caption}>Listening progress</Text>
     </View>
   );
@@ -33,7 +60,7 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: THEME.colors.secondary,
   },
-  caption: { color: THEME.colors.text.secondary, fontSize: 12 }
+  caption: { color: THEME.colors.text.secondary, fontSize: 12 },
 });
 
 export default PointsCounter;

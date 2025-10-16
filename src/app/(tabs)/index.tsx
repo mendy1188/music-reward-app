@@ -12,6 +12,7 @@ export default function HomeScreen() {
   const challenges = useMusicStore(selectChallenges);
   const currentTrack = useMusicStore(selectCurrentTrack);
   const isPlaying = useMusicStore(selectIsPlaying);
+  const setCurrentTrack = useMusicStore(s => s.setCurrentTrack);
   const { play } = useMusicPlayer();
 
   const handlePlayChallenge = async (challenge: MusicChallenge) => {
@@ -24,10 +25,16 @@ export default function HomeScreen() {
     }
   };
 
+  const openCompletedChallenge = (challenge: MusicChallenge) => {
+    setCurrentTrack(challenge);
+    router.push('/(modals)/player');
+  };
+
   const renderChallenge = ({ item }: { item: MusicChallenge }) => (
     <ChallengeCard
       challenge={item}
       onPlay={handlePlayChallenge}
+      onOpenCompletedChallenge={openCompletedChallenge}
       isCurrentTrack={currentTrack?.id === item.id}
       isPlaying={isPlaying}
     />

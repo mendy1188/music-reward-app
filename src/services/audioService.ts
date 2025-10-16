@@ -7,57 +7,46 @@ import TrackPlayer, {
 
 let setupPromise: Promise<void> | null = null;
 
-/**
- * Ensure TrackPlayer is initialized exactly once.
- * All public APIs in this file await this before touching the player.
- */
+/** Ensure TrackPlayer is initialized exactly once. */
 export const ensurePlayerSetup = async (): Promise<void> => {
   if (setupPromise) return setupPromise;
 
   setupPromise = (async () => {
-    // Initialize the native player
-    await TrackPlayer.setupPlayer({
-      waitForBuffer: true,
-    });
+    await TrackPlayer.setupPlayer({ waitForBuffer: true });
 
-    // Configure control-center / lockscreen capabilities
     await TrackPlayer.updateOptions({
+      // Keep UX honest: only expose what you actually support
       capabilities: [
         Capability.Play,
         Capability.Pause,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
         Capability.SeekTo,
-        Capability.Stop,
       ],
-      compactCapabilities: [Capability.Play, Capability.Pause, Capability.SeekTo],
+      compactCapabilities: [Capability.Play, Capability.Pause],
+      // fires progress events more frequently to your hooks
       progressUpdateEventInterval: 1,
+
       android: {
         appKilledPlaybackBehavior:
           AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
       },
       notificationCapabilities: [Capability.Play, Capability.Pause],
+      // iOS: ensure Background Modes → Audio is enabled in the Xcode target
     });
-    // (Optional) you can pre-warm any queue state here if you like.
   })();
 
   try {
     await setupPromise;
-    // success
   } catch (e) {
-    // allow retry next time if setup failed
-    setupPromise = null;
+    setupPromise = null; // allow retry if setup failed
     throw e;
   }
 };
 
-/** Reset player state */
-export const resetPlayer = async (): Promise<void> => {
+export const resetPlayer = async () => {
   await ensurePlayerSetup();
   await TrackPlayer.reset();
 };
 
-/** Add a single track */
 export const addTrack = async (track: {
   id: string;
   url: string;
@@ -65,54 +54,37 @@ export const addTrack = async (track: {
   artist: string;
   duration?: number;
   artwork?: string;
-}): Promise<void> => {
+}) => {
   await ensurePlayerSetup();
-  await TrackPlayer.add({
-    id: track.id,
-    url: track.url,
-    title: track.title,
-    artist: track.artist,
-    duration: track.duration,
-    artwork: track.artwork,
-  });
+  await TrackPlayer.add(track);
 };
 
-/** Playback controls */
-export const playTrack = async (): Promise<void> => {
+export const playTrack = async () => {
   await ensurePlayerSetup();
   await TrackPlayer.play();
 };
 
-export const pauseTrack = async (): Promise<void> => {
+export const pauseTrack = async () => {
   await ensurePlayerSetup();
   await TrackPlayer.pause();
 };
 
-export const seekToPosition = async (seconds: number): Promise<void> => {
+export const seekToPosition = async (seconds: number) => {
   await ensurePlayerSetup();
   await TrackPlayer.seekTo(seconds);
 };
 
-export const getCurrentPosition = async (): Promise<number> => {
+export const getCurrentPosition = async () => {
   await ensurePlayerSetup();
-  try {
-    return await TrackPlayer.getPosition();
-  } catch {
-    return 0;
-  }
+  try { return await TrackPlayer.getPosition(); } catch { return 0; }
 };
 
-export const getTrackDuration = async (): Promise<number> => {
+export const getTrackDuration = async () => {
   await ensurePlayerSetup();
-  try {
-    return await TrackPlayer.getDuration();
-  } catch {
-    return 0;
-  }
+  try { return await TrackPlayer.getDuration(); } catch { return 0; }
 };
 
-export const cleanupTrackPlayer = async (): Promise<void> => {
-  // Optional: keep queue/state? Here we hard reset.
+export const cleanupTrackPlayer = async () => {
   try {
     await ensurePlayerSetup();
     await TrackPlayer.reset();
@@ -121,11 +93,7 @@ export const cleanupTrackPlayer = async (): Promise<void> => {
   }
 };
 
-/** Helper to log and normalize errors */
 export const handlePlaybackError = (error: any) => {
   console.error('Playback error:', error);
-  return {
-    message: error?.message || 'Unknown playback error',
-    code: error?.code || 'UNKNOWN_ERROR',
-  };
+  return { message: error?.message || 'Unknown playback error', code: error?.code || 'UNKNOWN_ERROR' };
 };

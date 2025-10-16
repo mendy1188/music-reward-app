@@ -10,7 +10,7 @@ interface UserStore {
   
   // Actions
   addPoints: (points: number) => void;
-  completeChallenge: (challengeId: string) => void;
+  completeChallenge: (challengeId: string, awardPoints?: number) => void;
   resetProgress: () => void;
 }
 
@@ -28,13 +28,14 @@ export const useUserStore = create<UserStore>()(
         }));
       },
 
-      completeChallenge: (challengeId: string) => {
-        set((state) => ({
-          completedChallenges: state.completedChallenges.includes(challengeId)
-            ? state.completedChallenges
-            : [...state.completedChallenges, challengeId],
-        }));
-      },
+      completeChallenge: (challengeId, awardPoints) =>
+        set((state) => {
+          if (state.completedChallenges.includes(challengeId)) return state;
+          return {
+            completedChallenges: [...state.completedChallenges, challengeId],
+            totalPoints: awardPoints ? state.totalPoints + awardPoints : state.totalPoints,
+          };
+        }),
 
       resetProgress: () => {
         set({

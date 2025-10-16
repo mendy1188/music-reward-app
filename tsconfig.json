@@ -1,10 +1,14 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "jsx": "react-jsx",
     "strict": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
-    "moduleResolution": "Bundler"
+    "jsx": "react-native",
+    "types": ["react", "react-native"]
   },
-  "include": ["app", "src", "index.tsx"]
+  "include": ["src", "app", "index.ts", "index.tsx"]
 }

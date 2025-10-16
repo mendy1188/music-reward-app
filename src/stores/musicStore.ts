@@ -1,89 +1,129 @@
-// Zustand store for music playback and challenges
+// src/stores/musicStore.ts
+// Persist ONLY user progress (completedChallenges). Do NOT persist the catalog.
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MusicChallenge } from '../types';
+import type { MusicChallenge } from '../types';
 import { SAMPLE_CHALLENGES } from '../constants/theme';
 
 interface MusicStore {
-  // State
+  // Ephemeral UI/catalog state (NOT persisted)
   challenges: MusicChallenge[];
   currentTrack: MusicChallenge | null;
   isPlaying: boolean;
   currentPosition: number;
-  
+
+  // Persisted user progress (IDs only)
+  completedChallenges: string[];
+
   // Actions
-  loadChallenges: () => void;
-  setCurrentTrack: (track: MusicChallenge) => void;
+  loadChallenges: () => void; // rebuild from SAMPLE_CHALLENGES + completed IDs
+  setCurrentTrack: (track: MusicChallenge | null) => void;
   updateProgress: (challengeId: string, progress: number) => void;
   markChallengeComplete: (challengeId: string) => void;
   setIsPlaying: (playing: boolean) => void;
   setCurrentPosition: (position: number) => void;
+
+  // Dev helper
+  resetProgress: () => Promise<void>;
 }
+
+const buildChallenges = (completedIds: string[]): MusicChallenge[] =>
+  SAMPLE_CHALLENGES.map((c) => ({
+    ...c,
+    completed: completedIds.includes(c.id),
+    progress: completedIds.includes(c.id) ? 100 : 0,
+  }));
 
 export const useMusicStore = create<MusicStore>()(
   persist(
     (set, get) => ({
-      // Initial state
-      challenges: SAMPLE_CHALLENGES,
+      // Ephemeral (catalog + ui)
+      challenges: buildChallenges([]),
       currentTrack: null,
       isPlaying: false,
       currentPosition: 0,
 
+      // Persisted user progress
+      completedChallenges: [],
+
       // Actions
       loadChallenges: () => {
-        set({ challenges: SAMPLE_CHALLENGES });
+        const { completedChallenges } = get();
+        set({ challenges: buildChallenges(completedChallenges) });
       },
 
-      setCurrentTrack: (track: MusicChallenge) => {
-        set({ currentTrack: track });
-      },
+      setCurrentTrack: (track) => set({ currentTrack: track }),
 
-      updateProgress: (challengeId: string, progress: number) => {
+      updateProgress: (challengeId, progress) => {
         set((state) => ({
-          challenges: state.challenges.map((challenge) =>
-            challenge.id === challengeId
-              ? { ...challenge, progress: Math.min(progress, 100) }
-              : challenge
+          challenges: state.challenges.map((ch) =>
+            ch.id === challengeId
+              ? { ...ch, progress: Math.max(0, Math.min(progress, 100)) }
+              : ch
           ),
         }));
       },
 
-      markChallengeComplete: (challengeId: string) => {
-        set((state) => ({
-          challenges: state.challenges.map((challenge) =>
-            challenge.id === challengeId
-              ? { 
-                  ...challenge, 
-                  completed: true, 
+      markChallengeComplete: (challengeId) => {
+        set((state) => {
+          const already = state.completedChallenges.includes(challengeId);
+          const nextCompleted = already
+            ? state.completedChallenges
+            : [...state.completedChallenges, challengeId];
+
+          // reflect completion in ephemeral challenges
+          const nextChallenges = state.challenges.map((ch) =>
+            ch.id === challengeId
+              ? {
+                  ...ch,
+                  completed: true,
                   progress: 100,
-                  completedAt: new Date().toISOString()
+                  completedAt: new Date().toISOString(),
                 }
-              : challenge
-          ),
-        }));
+              : ch
+          );
+
+          return {
+            completedChallenges: nextCompleted,
+            challenges: nextChallenges,
+          };
+        });
       },
 
-      setIsPlaying: (playing: boolean) => {
-        set({ isPlaying: playing });
-      },
+      setIsPlaying: (playing) => set({ isPlaying: playing }),
+      setCurrentPosition: (position) => set({ currentPosition: position }),
 
-      setCurrentPosition: (position: number) => {
-        set({ currentPosition: position });
+      resetProgress: async () => {
+        // clear only the persisted progress; rebuild challenges fresh
+        set({ completedChallenges: [] });
+        set({ challenges: buildChallenges([]) });
       },
     }),
     {
       name: 'music-store',
       storage: createJSONStorage(() => AsyncStorage),
-      // Only persist challenges, not playback state
+
+      // ✅ Persist ONLY user progress
       partialize: (state) => ({
-        challenges: state.challenges,
+        completedChallenges: state.completedChallenges,
       }),
+
+      // After rehydrate, rebuild ephemeral challenges from SAMPLE + persisted progress
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        setTimeout(() => {
+          const completed = state.completedChallenges ?? [];
+          useMusicStore.setState({
+            challenges: buildChallenges(completed),
+          });
+        }, 0);
+      },
     }
   )
 );
 
-// Selector functions for performance
-export const selectCurrentTrack = (state: MusicStore) => state.currentTrack;
-export const selectIsPlaying = (state: MusicStore) => state.isPlaying;
-export const selectChallenges = (state: MusicStore) => state.challenges;
+// Selectors
+export const selectChallenges = (s: MusicStore) => s.challenges;
+export const selectCurrentTrack = (s: MusicStore) => s.currentTrack;
+export const selectIsPlaying = (s: MusicStore) => s.isPlaying;
