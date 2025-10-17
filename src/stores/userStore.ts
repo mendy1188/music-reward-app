@@ -47,6 +47,15 @@ export const useUserStore = create<UserStore>()(
     {
       name: 'user-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 2, // bump when shape changes
+      migrate: (persisted, fromVersion) => {
+        // Safely handle older shapes
+        if (!persisted) return { totalPoints: 0, completedChallenges: [] };
+        if (fromVersion < 2) {
+          // add future fields with defaults if you add them later
+        }
+        return persisted;
+      },
     }
   )
 );

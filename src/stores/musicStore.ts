@@ -142,14 +142,19 @@ export const useMusicStore = create<MusicStore>()(
     {
       name: 'music-store',
       storage: createJSONStorage(() => AsyncStorage),
-
-      // ✅ Persist ONLY progress IDs + the small deductions map
+      version: 3,
       partialize: (state) => ({
         completedChallenges: state.completedChallenges,
         deductionsById: state.deductionsById,
       }),
+      migrate: (persisted: any, from) => {
+        if (!persisted) return { completedChallenges: [], deductionsById: {} };
+        if (from < 3) {
+          // ...
+        }
+        return persisted;
+      },
 
-      // After rehydrate, rebuild ephemeral challenges from SAMPLE + persisted progress & deductions
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         setTimeout(() => {
