@@ -13,10 +13,13 @@ import { GlassCard, GlassButton } from '../../components/ui/GlassCard';
 import { useMusicPlayer } from '../../hooks/useMusicPlayer';
 import { THEME } from '../../constants/theme';
 import { PLAYBACK_RULES as RULES } from '../../constants/rules';
+import AudioEqualizer from '../../components/ui/AudioEqualizer';
+import { Confetti } from '../../components/ui/Confetti';
 
 export default function PlayerModal() {
   // —— Toast state (message-based) ——
   const [toastText, setToastText] = useState<string>('');
+  const [burst, setBurst] = useState(0);
   const toastAnim = useRef(new Animated.Value(0)).current;
   const hideToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -87,6 +90,15 @@ export default function PlayerModal() {
     }
   };
 
+  // when currentTrack just became completed:
+  useEffect(() => {
+    if (!currentTrack) return;
+    if (currentTrack.completed) {
+      setBurst((b) => b + 1);
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+    }
+  }, [currentTrack?.completed]);
+
   if (error) Alert.alert('Playback Error', error);
 
   if (loading) {
@@ -130,6 +142,7 @@ export default function PlayerModal() {
         {/* Progress Section */}
         <GlassCard style={styles.progressCard}>
           <Text style={styles.progressLabel}>Listening Progress</Text>
+          <AudioEqualizer playing={isPlaying} height={48} />
 
           {/* Progress Bar */}
           <TouchableOpacity
@@ -261,6 +274,17 @@ export default function PlayerModal() {
             <Text style={styles.toastText}>{toastText}</Text>
           </Animated.View>
         ) : null}
+
+        <View
+          pointerEvents="none"
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            zIndex: 9999,
+            elevation: 9999,
+          }}
+        >
+          <Confetti trigger={burst} />
+        </View>
       </View>
     </SafeAreaView>
   );
