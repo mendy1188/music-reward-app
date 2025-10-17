@@ -11,6 +11,7 @@ import { useMusicStore, selectCurrentTrack } from '../stores/musicStore';
 import { useUserStore, selectCompletedChallenges } from '../stores/userStore';
 import type { MusicChallenge, UseMusicPlayerReturn } from '../types';
 import { ensurePlayerSetup, setPlaybackRate, setPlayerVolume } from '../services/audioService';
+import { getPlayableUri } from '../services/cacheservice';
 import { PLAYBACK_RULES as RULES } from '../constants/rules';
 
 export const useMusicPlayer = (): UseMusicPlayerReturn => {
@@ -219,10 +220,11 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
       rateRef.current = 1;
       peakRateRef.current = 1;
 
+      const uri = await getPlayableUri(track.audioUrl);
       await TrackPlayer.reset();
       await TrackPlayer.add({
         id: track.id,
-        url: track.audioUrl,
+        url: uri,
         title: track.title,
         artist: track.artist,
         duration: track.duration,

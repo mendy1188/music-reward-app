@@ -22,18 +22,18 @@ export default function RootLayout() {
     })();
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      // 1) clear both persisted keys
-      await AsyncStorage.multiRemove(['music-store', 'user-store']);
+  // useEffect(() => {
+  //   (async () => {
+  //     // 1) clear both persisted keys
+  //     await AsyncStorage.multiRemove(['music-store', 'user-store']);
   
-      // 2) reset in-memory state to baseline
-      await useMusicStore.getState().resetProgress();
-      await useUserStore.getState().resetProgress();
+  //     // 2) reset in-memory state to baseline
+  //     await useMusicStore.getState().resetProgress();
+  //     await useUserStore.getState().resetProgress();
   
-      console.log('All stores and storage reset');
-    })();
-  }, []);
+  //     console.log('All stores and storage reset');
+  //   })();
+  // }, []);
   
 // useEffect(() => {
 //   AsyncStorage.clear().then(() => console.log('AsyncStorage cleared'));
