@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MusicChallenge } from '../types';
 import { SAMPLE_CHALLENGES } from '../constants/theme';
 
-type DeductionInfo = { pointsDeducted: number; forwardSeeks: number };
+type DeductionInfo = { pointsDeducted: number; forwardSeeks: number, peakRate?: number | undefined};
 
 interface MusicStore {
   // Ephemeral UI/catalog state (NOT persisted directly)
@@ -26,7 +26,7 @@ interface MusicStore {
   // Accept optional deduction info on complete
   markChallengeComplete: (
     challengeId: string,
-    opts?: { pointsDeducted?: number; forwardSeeks?: number }
+    opts?: { pointsDeducted?: number; forwardSeeks?: number, peakRate?: number }
   ) => void;
 
   setIsPlaying: (playing: boolean) => void;
@@ -50,6 +50,7 @@ const buildChallenges = (
       progress: completed ? 100 : 0,
       pointsDeducted: d?.pointsDeducted ?? 0,
       forwardSeeks: d?.forwardSeeks ?? 0,
+      peakRate: d?.peakRate ?? 0,
     };
   });
 
@@ -84,21 +85,23 @@ export const useMusicStore = create<MusicStore>()(
       },
 
       markChallengeComplete: (challengeId, opts) => {
-        set((state) => {
+        // state: any => not sure why 'untype state' was yelling
+        set((state: any) => {
           const already = state.completedChallenges.includes(challengeId);
           const nextCompleted = already
             ? state.completedChallenges
             : [...state.completedChallenges, challengeId];
 
           // persist/merge the deduction for this challenge
-          const prevDeduction = state.deductionsById[challengeId] ?? { pointsDeducted: 0, forwardSeeks: 0 };
+          const prevDeduction = state.deductionsById[challengeId] ?? { pointsDeducted: 0, forwardSeeks: 0, peakRate: undefined };
           const nextDeduction: DeductionInfo = {
             pointsDeducted: opts?.pointsDeducted ?? prevDeduction.pointsDeducted,
             forwardSeeks: opts?.forwardSeeks ?? prevDeduction.forwardSeeks,
+            peakRate: opts?.peakRate ?? prevDeduction.peakRate,
           };
 
           // reflect completion + deduction into ephemeral array
-          const nextChallenges = state.challenges.map((ch) =>
+          const nextChallenges = state.challenges.map((ch: any) =>
             ch.id === challengeId
               ? {
                   ...ch,
@@ -107,6 +110,7 @@ export const useMusicStore = create<MusicStore>()(
                   completedAt: new Date().toISOString(),
                   pointsDeducted: nextDeduction.pointsDeducted,
                   forwardSeeks: nextDeduction.forwardSeeks,
+                  peakRate: nextDeduction.peakRate,
                 }
               : ch
           );
@@ -126,7 +130,7 @@ export const useMusicStore = create<MusicStore>()(
         set((state) =>
           state.isPlaying === playing ? state : { isPlaying: playing }
         ),
-        
+
       setCurrentPosition: (position) => set({ currentPosition: position }),
 
       resetProgress: async () => {

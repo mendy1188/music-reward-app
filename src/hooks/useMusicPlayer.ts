@@ -7,10 +7,10 @@ import TrackPlayer, {
   Event,
   useTrackPlayerEvents,
 } from 'react-native-track-player';
-import { useMusicStore, selectCurrentTrack } from '../stores/musicStore'; // ← removed selectIsPlaying
+import { useMusicStore, selectCurrentTrack } from '../stores/musicStore';
 import { useUserStore, selectCompletedChallenges } from '../stores/userStore';
 import type { MusicChallenge, UseMusicPlayerReturn } from '../types';
-import { ensurePlayerSetup } from '../services/audioService';
+import { ensurePlayerSetup, setPlaybackRate, setPlayerVolume } from '../services/audioService';
 import { PLAYBACK_RULES as RULES } from '../constants/rules';
 
 export const useMusicPlayer = (): UseMusicPlayerReturn => {
@@ -36,11 +36,12 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
   const activeTrackIdRef = useRef<string | null>(null);
 
   /** Jump detection + counting */
-  const lastPosRef = useRef<number>(0);                              // last observed position (sec)
-  const forwardSeekCountRef = useRef<Record<string, number>>({});    // trackId -> count
+  const lastPosRef = useRef<number>(0);
+  const forwardSeekCountRef = useRef<Record<string, number>>({});
 
-  /** Cached rate */
+  /** Playback rate tracking: current + peak (for penalties) */
   const rateRef = useRef<number>(1);
+  const peakRateRef = useRef<number>(1);
 
   useTrackPlayerEvents([Event.PlaybackTrackChanged], async (e) => {
     if (e.type === Event.PlaybackTrackChanged && e.nextTrack != null) {
@@ -53,6 +54,9 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
           forwardSeekCountRef.current[nextId] = 0;
         }
         lastPosRef.current = 0;
+        // reset rates for the new track session
+        rateRef.current = 1;
+        peakRateRef.current = 1;
       } catch {
         activeTrackIdRef.current = null;
       }
@@ -71,13 +75,15 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
   // Derive isPlaying locally (do NOT mirror to store)
   const isPlaying = normalizedPlayback === State.Playing;
 
-  // Light polling for rate (so RULES.AWARD_ON_FAST_RATE can apply)
+  // Light polling for rate (so we can apply rate-based penalties)
   useEffect(() => {
     let mounted = true;
     const id = setInterval(async () => {
       try {
         const r = await TrackPlayer.getRate();
-        if (mounted && typeof r === 'number') rateRef.current = r;
+        if (!mounted || typeof r !== 'number') return;
+        rateRef.current = r;
+        if (r > peakRateRef.current) peakRateRef.current = r; // track peak
       } catch {}
     }, 800);
     return () => { mounted = false; clearInterval(id); };
@@ -104,7 +110,7 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     if (curr > prev) lastPosRef.current = curr;
   }, [progress.position, progress.duration, currentTrack]);
 
-  // Update UI + award with deduction once
+  // Update UI + award with deductions once
   useEffect(() => {
     if (!currentTrack) return;
     if (!progress || progress.duration <= 0) return;
@@ -125,22 +131,45 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
       return;
     }
 
+    // If re-earn is not allowed and track already completed, bail
     if (alreadyCompleted && !RULES.ALLOW_REEARN_ON_REPLAY) return;
+
+    // If your rules globally disallow awarding on fast rate (legacy), bail
     if (!RULES.AWARD_ON_FAST_RATE && rateRef.current > 1.0) return;
 
     if (pct >= RULES.COMPLETION_THRESHOLD_PCT && !alreadyAwardedThisSession) {
       awardedRef.current.add(currentTrack.id);
 
-      // ---------- DEDUCTION ----------
+      // ---------- DEDUCTIONS ----------
       const basePoints = currentTrack.points || 0;
+
+      // Forward-seek penalty
       const seeks = forwardSeekCountRef.current[currentTrack.id] || 0;
       const perSeek = RULES.DEDUCT_ON_FORWARD_SEEK ? RULES.FORWARD_SEEK_PENALTY_PCT : 0;
-      const totalDeductionPct = Math.min(1, seeks * perSeek);
+      const forwardPct = seeks * perSeek;
+
+      // Rate penalty (use *peak* rate used during this session)
+      const peak = peakRateRef.current;
+      let ratePct = 0;
+      if (peak >= 2.0 && RULES.RATE_PENALTY_PCT?.[2.0 as 2.0] != null) {
+        ratePct = RULES.RATE_PENALTY_PCT[2.0 as 2.0];
+      } else if (peak >= 1.25 && RULES.RATE_PENALTY_PCT?.[1.25 as 1.25] != null) {
+        ratePct = RULES.RATE_PENALTY_PCT[1.25 as 1.25];
+      }
+
+      const totalDeductionPct = Math.min(1, forwardPct + ratePct);
       const penalty = Math.floor(basePoints * totalDeductionPct);
       const effectivePoints = Math.max(0, basePoints - penalty);
       // --------------------------------
 
-      markChallengeComplete(currentTrack.id, { pointsDeducted: penalty, forwardSeeks: seeks });
+      // Persist per-track deduction metadata for Profile
+      markChallengeComplete(currentTrack.id, {
+        pointsDeducted: penalty,
+        forwardSeeks: seeks,
+        peakRate: peak,
+      });
+
+      // Award (after deductions)
       completeChallenge(currentTrack.id, effectivePoints);
     }
   }, [
@@ -161,16 +190,34 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     }
   });
 
+  /** simple fade helper (per-player volume) */
+  const fadeTo = useCallback(async (to: number, ms = 250) => {
+    const steps = 10;
+    const stepDur = ms / steps;
+    try {
+      const from = to > 0 ? 0 : 1; // quick fades at switches
+      for (let i = 0; i <= steps; i++) {
+        const v = from + (to - from) * (i / steps);
+        await setPlayerVolume(Math.max(0, Math.min(1, v)));
+        await new Promise((res) => setTimeout(res, stepDur));
+      }
+    } catch {}
+  }, []);
+
   const play = useCallback(async (track: MusicChallenge) => {
     setLoading(true);
     setError(null);
     try {
       await ensurePlayerSetup();
 
+      try { await fadeTo(0, 180); } catch {}
+
       activeTrackIdRef.current = null;
       awardedRef.current.delete(track.id);
       forwardSeekCountRef.current[track.id] = 0;
       lastPosRef.current = 0;
+      rateRef.current = 1;
+      peakRateRef.current = 1;
 
       await TrackPlayer.reset();
       await TrackPlayer.add({
@@ -185,6 +232,8 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
       setCurrentTrack(track);
       await TrackPlayer.play();
       activeTrackIdRef.current = track.id;
+
+      try { await fadeTo(1, 180); } catch {}
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Playback failed';
       setError(msg);
@@ -192,7 +241,7 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     } finally {
       setLoading(false);
     }
-  }, [setCurrentTrack]);
+  }, [setCurrentTrack, fadeTo]);
 
   const pause = useCallback(async () => {
     try { await ensurePlayerSetup(); await TrackPlayer.pause(); } catch (err) { console.error('Pause error:', err); }
@@ -202,7 +251,7 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     try {
       await ensurePlayerSetup();
 
-      // Primary counter: when *we* request a forward jump larger than the threshold
+      // Count forward seeks we initiate over the threshold
       if (currentTrack && seconds > lastPosRef.current + RULES.FORWARD_SEEK_THRESHOLD_SEC) {
         const id = currentTrack.id;
         forwardSeekCountRef.current[id] = (forwardSeekCountRef.current[id] || 0) + 1;
@@ -219,8 +268,19 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     try { await ensurePlayerSetup(); await TrackPlayer.play(); } catch (err) { console.error('Resume error:', err); }
   }, []);
 
+  /** Expose setRate: also update local refs to track peak rate for penalties */
+  const setRate = useCallback(async (rate: number) => {
+    try {
+      await setPlaybackRate(rate);
+      rateRef.current = rate;
+      if (rate > peakRateRef.current) peakRateRef.current = rate;
+    } catch (e) {
+      console.warn('setRate error', e);
+    }
+  }, []);
+
   return {
-    isPlaying, // ← derived locally
+    isPlaying, // derived locally
     currentTrack,
     currentPosition: progress.position,
     duration: progress.duration,
@@ -228,6 +288,7 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     pause,
     seekTo,
     resume,
+    setRate,
     loading,
     error,
   };

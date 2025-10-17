@@ -15,22 +15,22 @@ export const ensurePlayerSetup = async (): Promise<void> => {
     await TrackPlayer.setupPlayer({ waitForBuffer: true });
 
     await TrackPlayer.updateOptions({
-      // Keep UX honest: only expose what you actually support
       capabilities: [
         Capability.Play,
         Capability.Pause,
         Capability.SeekTo,
+        Capability.SkipToNext,
+        Capability.SkipToPrevious,
+        Capability.Stop,
       ],
-      compactCapabilities: [Capability.Play, Capability.Pause],
-      // fires progress events more frequently to your hooks
+      compactCapabilities: [Capability.Play, Capability.Pause, Capability.SeekTo],
       progressUpdateEventInterval: 1,
-
       android: {
         appKilledPlaybackBehavior:
           AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
       },
-      notificationCapabilities: [Capability.Play, Capability.Pause],
-      // iOS: ensure Background Modes → Audio is enabled in the Xcode target
+      //notificationCapabilities: [Capability.Play, Capability.Pause], could be enabled if needed
+      // iOS: Expo config app.config, enable Background -> Audio.
     });
   })();
 
@@ -96,4 +96,15 @@ export const cleanupTrackPlayer = async () => {
 export const handlePlaybackError = (error: any) => {
   console.error('Playback error:', error);
   return { message: error?.message || 'Unknown playback error', code: error?.code || 'UNKNOWN_ERROR' };
+};
+
+export const setPlaybackRate = async (rate: number) => {
+  await ensurePlayerSetup();
+  await TrackPlayer.setRate(rate);
+};
+
+export const setPlayerVolume = async (vol: number) => {
+  await ensurePlayerSetup();
+  // TrackPlayer.setVolume exists; if unsupported on some platforms, silently ignore errors || May be better implementation in the feature
+  try { await TrackPlayer.setVolume(vol); } catch {}
 };

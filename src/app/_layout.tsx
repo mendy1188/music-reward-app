@@ -1,5 +1,3 @@
-// Root layout for Expo Router
-import '../lib/track-player-service'; // <-- side-effect import
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { ensurePlayerSetup } from '../services/audioService';
@@ -7,6 +5,11 @@ import ErrorBoundary from '../components/util/ErrorBoundary';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMusicStore } from '../stores/musicStore';
 import { useUserStore } from '../stores/userStore';
+
+//Register Trackplayer once at app entry
+import TrackPlayer from 'react-native-track-player';
+import { playbackService } from '../services/playbackService';
+TrackPlayer.registerPlaybackService(() => playbackService);
 
 export default function RootLayout() {
   useEffect(() => {

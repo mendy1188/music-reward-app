@@ -15,6 +15,7 @@ export interface MusicChallenge {
   completedAt?: string;
   pointsDeducted?: number;
   forwardSeeks?: number;
+  peakRate?: number;
 }
 
 export interface PointsCounterConfig {
@@ -32,6 +33,7 @@ export interface UseMusicPlayerReturn {
   pause: () => void;
   resume: () => void;
   seekTo: (seconds: number) => void;
+  setRate: (rate: number) => void;
   loading: boolean;
   error: string | null;
 }

@@ -65,7 +65,7 @@ export default function ProfileScreen() {
               <Text style={styles.progressText}>
                 {Math.round(challenge.progress)}% • {totalCompletedPoints} points
                 {(isCompleted && totalPointsDeducted > 0) ? (
-                  <> • {totalPointsDeducted} deducted for skips</>
+                  <> • {totalPointsDeducted} deducted for forwarding</>
                 ) : null}
               </Text>
             </View>
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   progressText: {
-    fontSize: THEME.fonts.sizes.sm,
+    fontSize: THEME.fonts.sizes.xs,
     color: THEME.colors.text.secondary,
   },
   achievementsCard: {

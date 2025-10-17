@@ -1,4 +1,3 @@
-// src/app/(modals)/player.tsx
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
@@ -9,15 +8,39 @@ import {
   Alert,
   Animated,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { GlassCard, GlassButton } from '../../components/ui/GlassCard';
 import { useMusicPlayer } from '../../hooks/useMusicPlayer';
 import { THEME } from '../../constants/theme';
 import { PLAYBACK_RULES as RULES } from '../../constants/rules';
 
 export default function PlayerModal() {
-  const [showFastToast, setShowFastToast] = useState(false);
+  // —— Toast state (message-based) ——
+  const [toastText, setToastText] = useState<string>('');
   const toastAnim = useRef(new Animated.Value(0)).current;
   const hideToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (msg: string) => {
+    if (!msg) return;
+    setToastText(msg);
+    if (hideToastTimer.current) clearTimeout(hideToastTimer.current);
+
+    // fade in
+    Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+    // auto hide
+    hideToastTimer.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        setToastText('');
+      });
+    }, 1500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hideToastTimer.current) clearTimeout(hideToastTimer.current);
+    };
+  }, []);
 
   const {
     currentTrack,
@@ -27,32 +50,10 @@ export default function PlayerModal() {
     pause,
     resume,
     seekTo,
+    setRate,
     loading,
     error,
   } = useMusicPlayer();
-
-  const flashFastToast = () => {
-    if (RULES.DEDUCT_ON_FORWARD_SEEK) {
-      setShowFastToast(true);
-      if (hideToastTimer.current) clearTimeout(hideToastTimer.current);
-      hideToastTimer.current = setTimeout(() => setShowFastToast(false), 1500);
-    }
-  };
-
-  useEffect(
-    () => () => {
-      if (hideToastTimer.current) clearTimeout(hideToastTimer.current);
-    },
-    []
-  );
-
-  useEffect(() => {
-    Animated.timing(toastAnim, {
-      toValue: showFastToast ? 1 : 0,
-      duration: 220,
-      useNativeDriver: true,
-    }).start();
-  }, [showFastToast, toastAnim]);
 
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
@@ -65,11 +66,15 @@ export default function PlayerModal() {
     return (currentPosition / duration) * 100;
   };
 
+  // ——— Seek handler: toast shows skip penalty ———
   const handleSeek = (percentage: number) => {
     if (!duration) return;
     const newPosition = (percentage / 100) * duration;
-    if (newPosition > currentPosition + RULES.FORWARD_SEEK_THRESHOLD_SEC) {
-      flashFastToast();
+
+    // Only treat as forward seek if beyond threshold
+    if (newPosition > currentPosition + (RULES.FORWARD_SEEK_THRESHOLD_SEC || 0)) {
+      const pct = Math.round((RULES.FORWARD_SEEK_PENALTY_PCT || 0) * 100);
+      if (pct > 0) showToast(`−${pct}% for skipping forward`);
     }
     seekTo(newPosition);
   };
@@ -187,6 +192,28 @@ export default function PlayerModal() {
             />
           </View>
 
+          {/* Speed buttons — toast shows penalty per rate */}
+          <View style={[styles.controlsRow, { marginTop: THEME.spacing.sm }]}>
+            {([0.5, 1.0, 1.25, 2.0] as const).map((r) => (
+              <GlassButton
+                key={r}
+                title={`${r}x`}
+                onPress={async () => {
+                  try { await Haptics.selectionAsync(); } catch {}
+                  setRate?.(r);
+
+                  const penaltyPct = (RULES.RATE_PENALTY_PCT as Record<number, number>)[r] ?? 0;
+                  if (penaltyPct > 0) {
+                    const pct = Math.round(penaltyPct * 100);
+                    showToast(`−${pct}% at ${r}× speed`);
+                  }
+                }}
+                variant="secondary"
+                style={styles.controlButton}
+              />
+            ))}
+          </View>
+
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </GlassCard>
 
@@ -212,28 +239,28 @@ export default function PlayerModal() {
           </View>
         </GlassCard>
 
-        {/* Fast-forward toast */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.toast,
-            {
-              opacity: toastAnim,
-              transform: [
-                {
-                  translateY: toastAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [24, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <Text style={styles.toastText}>
-            −{Math.round((RULES.FORWARD_SEEK_PENALTY_PCT || 0) * 100)}% for skipping
-          </Text>
-        </Animated.View>
+        {/* Toast */}
+        {toastText ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.toast,
+              {
+                opacity: toastAnim,
+                transform: [
+                  {
+                    translateY: toastAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [24, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.toastText}>{toastText}</Text>
+          </Animated.View>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -267,7 +294,7 @@ const styles = StyleSheet.create({
   progressPercentage: { fontSize: THEME.fonts.sizes.lg, fontWeight: 'bold', color: THEME.colors.accent, textAlign: 'center' },
   controlsCard: {},
   controlsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  controlButton: { flex: 0.30, marginHorizontal: THEME.spacing.xs, fontSize: THEME.fonts.sizes.xxs },
+  controlButton: { flex: 0.30, marginHorizontal: THEME.spacing.xs },
   mainControlButton: { flex: 0.4, marginHorizontal: THEME.spacing.xs },
   errorText: { color: '#FF6B6B', fontSize: THEME.fonts.sizes.sm, textAlign: 'center', marginTop: THEME.spacing.md },
   challengeCard: {},

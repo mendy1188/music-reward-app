@@ -9,10 +9,12 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@mhpdev/react-native-haptics": "^1.0.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~54.0.10",
     "expo-blur": "~15.0.7",
     "expo-dev-client": "~6.0.15",
+    "expo-haptics": "~15.0.7",
     "expo-linear-gradient": "~15.0.7",
     "expo-router": "~6.0.10",
     "react": "19.1.0",
@@ -33,4 +35,3 @@
     "typescript": "~5.9.2"
   }
 }
-

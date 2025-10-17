@@ -19,7 +19,7 @@ export const THEME = {
     medium: 'System', 
     bold: 'System',
     sizes: {
-      xxs: 10,
+      xxs: 6,
       xs: 12,
       sm: 14,
       md: 16,
