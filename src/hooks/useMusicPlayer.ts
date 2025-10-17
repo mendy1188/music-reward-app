@@ -12,6 +12,7 @@ import { useUserStore, selectCompletedChallenges } from '../stores/userStore';
 import type { MusicChallenge, UseMusicPlayerReturn } from '../types';
 import { ensurePlayerSetup, setPlaybackRate, setPlayerVolume } from '../services/audioService';
 import { getPlayableUri } from '../services/cacheservice';
+import { saveCompletionServer } from '../services/syncService';
 import { PLAYBACK_RULES as RULES } from '../constants/rules';
 
 export const useMusicPlayer = (): UseMusicPlayerReturn => {
@@ -161,7 +162,6 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
       const totalDeductionPct = Math.min(1, forwardPct + ratePct);
       const penalty = Math.floor(basePoints * totalDeductionPct);
       const effectivePoints = Math.max(0, basePoints - penalty);
-      // --------------------------------
 
       // Persist per-track deduction metadata for Profile
       markChallengeComplete(currentTrack.id, {
@@ -172,6 +172,17 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
 
       // Award (after deductions)
       completeChallenge(currentTrack.id, effectivePoints);
+
+      // rollback on failure
+      saveCompletionServer({ challengeId: currentTrack.id, pointsAwarded: effectivePoints })
+        .catch(() => {
+          // Rollback: (simple example—subtract points and un-complete)
+          useUserStore.setState((s) => ({ totalPoints: Math.max(0, s.totalPoints - effectivePoints),
+            completedChallenges: s.completedChallenges.filter(id => id !== currentTrack.id) }));
+          useMusicStore.setState((s) => ({
+            challenges: s.challenges.map(ch => ch.id === currentTrack.id ? { ...ch, completed: false, progress: 0 } : ch)
+          }));
+        });
     }
   }, [
     progress.position,

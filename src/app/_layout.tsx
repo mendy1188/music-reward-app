@@ -35,9 +35,13 @@ export default function RootLayout() {
   //   })();
   // }, []);
   
-// useEffect(() => {
-//   AsyncStorage.clear().then(() => console.log('AsyncStorage cleared'));
-// }, []);
+  useEffect(() => {
+    const t = setInterval(() => {
+      // pretend remote sync changing nothing critical; or push a toast
+      // useUserStore.setState(s => ({ totalPoints: s.totalPoints })); // noop ping
+    }, 30000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <ErrorBoundary>
