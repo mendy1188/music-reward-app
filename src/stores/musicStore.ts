@@ -122,7 +122,11 @@ export const useMusicStore = create<MusicStore>()(
         });
       },
 
-      setIsPlaying: (playing) => set({ isPlaying: playing }),
+      setIsPlaying: (playing) =>
+        set((state) =>
+          state.isPlaying === playing ? state : { isPlaying: playing }
+        ),
+        
       setCurrentPosition: (position) => set({ currentPosition: position }),
 
       resetProgress: async () => {

@@ -161,7 +161,7 @@ export default function PlayerModal() {
         <GlassCard style={styles.controlsCard}>
           <View style={styles.controlsRow}>
             <GlassButton
-              title="⏪ -10s"
+              title="⏪ 10s"
               onPress={() =>
                 handleSeek(Math.max(0, getProgress() - (10 / (duration || 1)) * 100))
               }
@@ -178,7 +178,7 @@ export default function PlayerModal() {
             />
 
             <GlassButton
-              title="⏩ +10s"
+              title="⏩ 10s"
               onPress={() =>
                 handleSeek(Math.min(100, getProgress() + (10 / (duration || 1)) * 100))
               }
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   progressPercentage: { fontSize: THEME.fonts.sizes.lg, fontWeight: 'bold', color: THEME.colors.accent, textAlign: 'center' },
   controlsCard: {},
   controlsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  controlButton: { flex: 0.25, marginHorizontal: THEME.spacing.xs },
+  controlButton: { flex: 0.30, marginHorizontal: THEME.spacing.xs, fontSize: THEME.fonts.sizes.xxs },
   mainControlButton: { flex: 0.4, marginHorizontal: THEME.spacing.xs },
   errorText: { color: '#FF6B6B', fontSize: THEME.fonts.sizes.sm, textAlign: 'center', marginTop: THEME.spacing.md },
   challengeCard: {},

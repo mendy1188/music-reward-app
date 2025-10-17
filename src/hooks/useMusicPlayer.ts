@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+// src/hooks/useMusicPlayer.ts
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import TrackPlayer, {
   State,
   usePlaybackState,
@@ -6,7 +7,7 @@ import TrackPlayer, {
   Event,
   useTrackPlayerEvents,
 } from 'react-native-track-player';
-import { useMusicStore, selectCurrentTrack, selectIsPlaying } from '../stores/musicStore';
+import { useMusicStore, selectCurrentTrack } from '../stores/musicStore'; // ← removed selectIsPlaying
 import { useUserStore, selectCompletedChallenges } from '../stores/userStore';
 import type { MusicChallenge, UseMusicPlayerReturn } from '../types';
 import { ensurePlayerSetup } from '../services/audioService';
@@ -20,9 +21,7 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
   const [error, setError] = useState<string | null>(null);
 
   const currentTrack = useMusicStore(selectCurrentTrack);
-  const isPlaying = useMusicStore(selectIsPlaying);
   const setCurrentTrack = useMusicStore((s) => s.setCurrentTrack);
-  const setIsPlaying = useMusicStore((s) => s.setIsPlaying);
   const setCurrentPosition = useMusicStore((s) => s.setCurrentPosition);
   const updateProgress = useMusicStore((s) => s.updateProgress);
   const markChallengeComplete = useMusicStore((s) => s.markChallengeComplete);
@@ -60,6 +59,18 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     }
   });
 
+  // Normalize playback to primitive State
+  const normalizedPlayback: State | undefined = useMemo(() => {
+    if (typeof playbackState === 'number') return playbackState as State;
+    if (playbackState && typeof playbackState === 'object' && 'state' in playbackState) {
+      return (playbackState as any).state as State;
+    }
+    return undefined;
+  }, [playbackState]);
+
+  // Derive isPlaying locally (do NOT mirror to store)
+  const isPlaying = normalizedPlayback === State.Playing;
+
   // Light polling for rate (so RULES.AWARD_ON_FAST_RATE can apply)
   useEffect(() => {
     let mounted = true;
@@ -72,21 +83,9 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     return () => { mounted = false; clearInterval(id); };
   }, []);
 
-  // Keep isPlaying in sync
-  useEffect(() => {
-    let stateValue: any = playbackState;
-    if (typeof playbackState === 'object' && playbackState && 'state' in playbackState) {
-      stateValue = (playbackState as any).state;
-    }
-    const isCurrentlyPlaying = stateValue === State.Playing;
-    if (isCurrentlyPlaying !== isPlaying) setIsPlaying(isCurrentlyPlaying);
-  }, [playbackState, isPlaying, setIsPlaying]);
-
   /**
-   * Fallback **jump detector**: if the reported position jumps forward
+   * Fallback jump detector: if reported position jumps forward
    * by more than the threshold, count it as a forward seek.
-   * This covers cases where the native seek finishes before our
-   * hook-level seek wrapper runs.
    */
   useEffect(() => {
     if (!currentTrack) return;
@@ -99,8 +98,6 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     if (delta > RULES.FORWARD_SEEK_THRESHOLD_SEC) {
       const id = currentTrack.id;
       forwardSeekCountRef.current[id] = (forwardSeekCountRef.current[id] || 0) + 1;
-      // Optional debug:
-      // console.log('counted forward seek via progress jump', id, 'count=', forwardSeekCountRef.current[id]);
     }
 
     // keep monotonic pointer
@@ -134,14 +131,14 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     if (pct >= RULES.COMPLETION_THRESHOLD_PCT && !alreadyAwardedThisSession) {
       awardedRef.current.add(currentTrack.id);
 
-      // ---------- DEDUCTION HERE ----------
+      // ---------- DEDUCTION ----------
       const basePoints = currentTrack.points || 0;
       const seeks = forwardSeekCountRef.current[currentTrack.id] || 0;
       const perSeek = RULES.DEDUCT_ON_FORWARD_SEEK ? RULES.FORWARD_SEEK_PENALTY_PCT : 0;
       const totalDeductionPct = Math.min(1, seeks * perSeek);
       const penalty = Math.floor(basePoints * totalDeductionPct);
       const effectivePoints = Math.max(0, basePoints - penalty);
-      // ------------------------------------
+      // --------------------------------
 
       markChallengeComplete(currentTrack.id, { pointsDeducted: penalty, forwardSeeks: seeks });
       completeChallenge(currentTrack.id, effectivePoints);
@@ -209,8 +206,6 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
       if (currentTrack && seconds > lastPosRef.current + RULES.FORWARD_SEEK_THRESHOLD_SEC) {
         const id = currentTrack.id;
         forwardSeekCountRef.current[id] = (forwardSeekCountRef.current[id] || 0) + 1;
-        // Optional debug:
-        // console.log('counted forward seek via seekTo', id, 'count=', forwardSeekCountRef.current[id]);
       }
 
       await TrackPlayer.seekTo(seconds);
@@ -224,13 +219,8 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     try { await ensurePlayerSetup(); await TrackPlayer.play(); } catch (err) { console.error('Resume error:', err); }
   }, []);
 
-  let stateValue: any = playbackState;
-  if (typeof playbackState === 'object' && playbackState && 'state' in playbackState) {
-    stateValue = (playbackState as any).state;
-  }
-
   return {
-    isPlaying: stateValue === State.Playing,
+    isPlaying, // ← derived locally
     currentTrack,
     currentPosition: progress.position,
     duration: progress.duration,
