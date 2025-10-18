@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   noTrackSubtext: { fontSize: THEME.fonts.sizes.md, color: THEME.colors.text.secondary, textAlign: 'center' },
   trackInfoCard: { alignItems: 'center' },
   trackTitle: { fontSize: THEME.fonts.sizes.xxl, fontWeight: 'bold', color: THEME.colors.text.primary, textAlign: 'center', marginBottom: THEME.spacing.xs },
-  trackArtist: { fontSize: THEME.fonts.sizes.lg, color: THEME.colors.text.secondary, marginBottom: THEME.spacing.md },
+  trackArtist: { fontSize: THEME.fonts.sizes.lg, color: THEME.colors.text.secondary, marginBottom: THEME.spacing.md, textAlign: 'center' },
   trackDescription: { fontSize: THEME.fonts.sizes.sm, color: THEME.colors.text.tertiary, textAlign: 'center', marginBottom: THEME.spacing.lg },
   pointsContainer: { alignItems: 'center' },
   pointsLabel: { fontSize: THEME.fonts.sizes.sm, color: THEME.colors.text.secondary },

@@ -4,6 +4,8 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { useMusicStore, selectChallenges } from '../../stores/musicStore';
 import { useUserStore, selectTotalPoints, selectCompletedChallenges } from '../../stores/userStore';
 import { THEME } from '../../constants/theme';
+import { useTheme } from '../../hooks/useTheme';
+import { useThemeStore } from '../../stores/themeStore';
 
 export default function ProfileScreen() {
   const challenges = useMusicStore(selectChallenges);

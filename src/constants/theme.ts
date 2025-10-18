@@ -51,6 +51,29 @@ export const THEME = {
   }
 };
 
+// Light theme variant (balanced to match your brand colors) ──
+export const THEME_LIGHT = {
+  ...THEME,
+  colors: {
+    ...THEME.colors,
+    background: '#F7F8FA',
+    glass: 'rgba(0, 0, 0, 0.06)',
+    text: {
+      primary: '#0E0F12',
+      secondary: 'rgba(14, 15, 18, 0.70)',
+      tertiary: 'rgba(14, 15, 18, 0.50)',
+    },
+    border: 'rgba(14, 15, 18, 0.16)',
+  },
+};
+
+export const THEME_DARK = THEME;
+
+export const THEMES = {
+  light: THEME_LIGHT,
+  dark: THEME_DARK,
+} as const;
+
 // Sample challenge data with actual Belong tracks
 export const SAMPLE_CHALLENGES = [
   {
