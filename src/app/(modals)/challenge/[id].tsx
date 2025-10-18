@@ -174,6 +174,7 @@ export default function ChallengeDetail() {
                             const pct = (locationX / width) * 100;
                             handleSeek(pct);
                         }}
+                        disabled={true}
                     >
                         <View style={styles.progressBackground}>
                             <View style={[styles.progressFill, { width: `${Math.round(liveProgressPct)}%` }]} />
@@ -204,6 +205,11 @@ export default function ChallengeDetail() {
                                     ? isThisPlaying ? '⏸︎ Pause' : '▶︎ Resume'
                                     : '▶︎ Play'
                             }
+                            accessibilityLabel={
+                                currentTrack?.id === challenge.id 
+                                    ? isThisPlaying ? "Pause playback" : "Resume playback" 
+                                    : "Play track"
+                                }
                             onPress={handlePlayPress}
                             variant="primary"
                             loading={loading}

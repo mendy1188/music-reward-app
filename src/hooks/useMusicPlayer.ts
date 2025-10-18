@@ -63,12 +63,17 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     }
   });
 
-  useTrackPlayerEvents([Event.RemoteDuck], (e: any) => {
+  useTrackPlayerEvents([Event.RemoteDuck], (e: { paused?: boolean; ducking?: boolean; }) => {
     // iOS/Android audio focus changes (calls, Siri, other apps)
     if (e?.paused === true) {
       TrackPlayer.pause().catch(() => {});
     } else if (e?.paused === false) {
       TrackPlayer.play().catch(() => {});
+    }
+
+    // Gentle ducking while another app speaks (navigation, assistant)
+    if (typeof e.ducking === 'boolean') {
+      TrackPlayer.setVolume(e.ducking ? 0.3 : 1.0).catch(() => {});
     }
   });
 
@@ -76,7 +81,7 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
   const normalizedPlayback: State | undefined = useMemo(() => {
     if (typeof playbackState === 'number') return playbackState as State;
     if (playbackState && typeof playbackState === 'object' && 'state' in playbackState) {
-      return (playbackState as any).state as State;
+      return (playbackState).state as State;
     }
     return undefined;
   }, [playbackState]);
@@ -223,6 +228,55 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
     } catch {}
   }, []);
 
+  /** Ensure the native queue has our current JS track as the active item. */
+  const ensureNativeQueueForCurrent = useCallback(async () => {
+    const jsTrack = useMusicStore.getState().currentTrack;
+    if (!jsTrack) return;
+
+    // Snapshot native state. 
+    //Types to be worked on later. Use any for now
+    let nativeActive: any = null;
+    let queue: any[] = [];
+    try { nativeActive = await TrackPlayer.getActiveTrack(); } catch {}
+    try { queue = await TrackPlayer.getQueue(); } catch {}
+
+    const needsReload =
+      !nativeActive ||
+      !Array.isArray(queue) || queue.length === 0 ||
+      (nativeActive?.id && nativeActive.id !== jsTrack.id);
+
+    if (needsReload) {
+      // Rebuild the queue with the current JS-selected track
+      const url = await resolvePlayableUrl(jsTrack.audioUrl);
+      await TrackPlayer.reset();
+      await TrackPlayer.add({
+        id: jsTrack.id,
+        url,
+        title: jsTrack.title,
+        artist: jsTrack.artist,
+        duration: jsTrack.duration,
+        artwork: (jsTrack as any).imageUrl,
+      });
+      activeTrackIdRef.current = jsTrack.id;
+    }
+
+    // If we’re at/near the end, seek to start; else restore last known position
+    const dur =
+      (await TrackPlayer.getDuration().catch(() => 0)) ||
+      jsTrack.duration || 0;
+
+    const lastPos = Math.max(0, useMusicStore.getState().currentPosition || 0);
+    const pos = await TrackPlayer.getPosition().catch(() => lastPos);
+
+    // Treat “stuck at tail” as finished
+    if (dur && pos >= Math.max(0, dur - 0.75)) {
+      await TrackPlayer.seekTo(0);
+    } else if (lastPos > 0 && lastPos < dur - 0.75) {
+      await TrackPlayer.seekTo(lastPos);
+    }
+  }, []);
+
+
   const play = useCallback(async (track: MusicChallenge) => {
     setLoading(true);
     setError(null);
@@ -285,8 +339,23 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
   }, [currentTrack]);
 
   const resume = useCallback(async () => {
-    try { await ensurePlayerSetup(); await TrackPlayer.play(); } catch (err) { console.error('Resume error:', err); }
-  }, []);
+    try {
+      await ensurePlayerSetup();
+  
+      const jsTrack = useMusicStore.getState().currentTrack;
+      if (!jsTrack) return;
+  
+      // If the challenge was completed and re-earn is disabled,
+      // we still allow replay — just start from the top.
+      // (ensureNativeQueueForCurrent will handle the seek)
+      await ensureNativeQueueForCurrent();
+  
+      // Finally, play
+      await TrackPlayer.play();
+    } catch (err) {
+      console.error('Resume error:', err);
+    }
+  }, [ensureNativeQueueForCurrent]);
 
   /** Expose setRate: also update local refs to track peak rate for penalties */
   const setRate = useCallback(async (rate: number) => {

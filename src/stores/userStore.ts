@@ -35,10 +35,11 @@ export const useUserStore = create<UserStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       version: 2,
       migrate: (persisted: any, fromVersion) => {
+        //persisted: any => This needs to be worked on for better type
         const base = { totalPoints: 0, completedChallenges: [] as string[] };
         if (!persisted || typeof persisted !== 'object') return base;
 
-        const p: any = { ...persisted };
+        const p = { ...persisted };
         p.totalPoints = Math.max(0, Number(p.totalPoints) || 0);
         p.completedChallenges = Array.isArray(p.completedChallenges)
           ? p.completedChallenges.filter((x: any) => typeof x === 'string' && x)

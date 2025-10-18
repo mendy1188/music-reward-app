@@ -152,7 +152,7 @@ export const useMusicStore = create<MusicStore>()(
 
         if (!persisted || typeof persisted !== 'object') return base;
 
-        const p: any = { ...persisted };
+        const p = { ...persisted };
 
         // ensure arrays/objects
         p.completedChallenges = Array.isArray(p.completedChallenges)

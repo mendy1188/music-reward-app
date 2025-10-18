@@ -147,7 +147,7 @@ export default function PlayerModal() {
           <Text style={styles.progressLabel}>Listening Progress</Text>
           <AudioEqualizer playing={isPlaying} isCurrentTrack={true} height={48} />
 
-          {/* Progress Bar */}
+          {/* Progress Bar: Disabled to avoid drag at the moment. Can be worked on later to allow drag */}
           <TouchableOpacity
             style={styles.progressTrack}
             onPress={(event) => {
@@ -155,6 +155,11 @@ export default function PlayerModal() {
               const percentage = (locationX / width) * 100;
               handleSeek(percentage);
             }}
+            disabled={true}
+            accessible
+            accessibilityRole="adjustable"
+            accessibilityLabel="Seek in track"
+            accessibilityHint="Double tap and hold, then slide left or right to seek"
           >
             <View style={styles.progressBackground}>
               <View
@@ -182,6 +187,8 @@ export default function PlayerModal() {
         <GlassCard style={styles.controlsCard}>
           <View style={styles.controlsRow}>
             <GlassButton
+              accessibilityLabel="Rewind 10 seconds"
+              accessibilityHint="Tap to go back ten seconds."
               title="⏪ 10s"
               onPress={() =>
                 handleSeek(Math.max(0, getProgress() - (10 / (duration || 1)) * 100))
@@ -192,6 +199,7 @@ export default function PlayerModal() {
 
             <GlassButton
               title={loading ? '...' : isPlaying ? '⏸️ Pause' : '▶️ Play'}
+              accessibilityLabel={isPlaying ? 'Pause playback' : 'Play track'}
               onPress={handlePlayPause}
               variant="primary"
               style={styles.mainControlButton}
@@ -199,6 +207,8 @@ export default function PlayerModal() {
             />
 
             <GlassButton
+              accessibilityLabel="Forward 10 seconds"
+              accessibilityHint="Tap to go forward ten seconds."
               title="⏩ 10s"
               onPress={() =>
                 handleSeek(Math.min(100, getProgress() + (10 / (duration || 1)) * 100))
@@ -226,6 +236,8 @@ export default function PlayerModal() {
                 }}
                 variant="secondary"
                 style={styles.controlButton}
+                accessibilityLabel={`Playback speed ${r}x times`}
+                accessibilityHint={`Playback speed ${r}x times faster than normal playback speed`}
               />
             ))}
           </View>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, AccessibilityState } from 'react-native';
 import { GlassCard, GlassButton } from '../ui/GlassCard';
 import { THEME } from '../../constants/theme';
 import type { MusicChallenge } from '../../types';
@@ -45,6 +45,49 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
     if (isCurrentTrack && !isPlaying) return 'Resume';
     return 'Play Challenge';
   };
+
+  const getButtonA11y = (): {
+    label: string;
+    hint: string;
+    state?: AccessibilityState;
+  } => {
+    // Completed
+    if (challenge.completed) {
+      return {
+        label: `${challenge.title}. Challenge completed.`,
+        hint: 'Tap to play again. Replays will not earn points.',
+        state: { disabled: false, selected: true },
+      };
+    }
+  
+    // Current track & playing
+    if (isCurrentTrack && isPlaying) {
+      return {
+        label: `${challenge.title}. Playing.`,
+        hint: 'Tap to pause.',
+        state: { busy: true, selected: true },
+      };
+    }
+  
+    // Current track but paused
+    if (isCurrentTrack && !isPlaying) {
+      return {
+        label: `${challenge.title}. Paused.`,
+        hint: 'Tap to resume.',
+        state: { selected: true },
+      };
+    }
+  
+    // Not current track
+    return {
+      label: `${challenge.title}. Not playing.`,
+      hint: 'Tap to start this challenge.',
+      state: { selected: false },
+    };
+  };
+
+  const buttonTitle = getButtonTitle();
+  const a11y = getButtonA11y();
 
   // const handleCardPress = () => {
   //   // allow opening when this is the current track OR the challenge is completed
@@ -108,7 +151,9 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
         )}
 
         <GlassButton
-          title={getButtonTitle()}
+          title={buttonTitle}
+          accessibilityLabel={a11y.label}
+          accessibilityHint={a11y.hint}
           onPress={() => onPlay(challenge)}
           variant={isCurrentTrack ? 'primary' : 'secondary'}
           disabled={challenge.completed || disablePlay}

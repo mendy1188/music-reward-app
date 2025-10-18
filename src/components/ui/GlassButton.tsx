@@ -11,7 +11,6 @@ export type GlassButtonProps = {
   disabled?: boolean;
   style?: ViewStyle;
   accessibilityLabel?: string;
-  textSmaller?: boolean;
 };
 
 export const GlassButton: React.FC<GlassButtonProps> = ({
@@ -21,7 +20,6 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   disabled,
   style,
   accessibilityLabel,
-  textSmaller
 }) => {
   const isDisabled = disabled || loading;
 

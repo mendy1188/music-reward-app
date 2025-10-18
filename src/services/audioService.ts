@@ -11,7 +11,6 @@ let setupPromise: Promise<void> | null = null;
 /** Ensure TrackPlayer is initialized exactly once. */
 export const ensurePlayerSetup = async (): Promise<void> => {
   if (setupPromise) return setupPromise;
-
   setupPromise = (async () => {
     await TrackPlayer.setupPlayer({ waitForBuffer: true });
 
@@ -30,8 +29,7 @@ export const ensurePlayerSetup = async (): Promise<void> => {
         appKilledPlaybackBehavior:
           AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
       },
-      //notificationCapabilities: [Capability.Play, Capability.Pause], could be enabled if needed
-      // iOS: Expo config app.config, enable Background -> Audio.
+      // Expo config app.config, enable Background -> Audio.
     });
   })();
 
@@ -94,10 +92,13 @@ export const cleanupTrackPlayer = async () => {
   }
 };
 
-export const handlePlaybackError = (error: any) => {
-  console.error('Playback error:', error);
-  return { message: error?.message || 'Unknown playback error', code: error?.code || 'UNKNOWN_ERROR' };
+export const handlePlaybackError = (error: unknown): { message: string; code: string } => {
+  if (error && typeof error === 'object' && 'message' in error) {
+    return { message: String(error.message ?? 'Unknown playback error'), code: String((error as any).code ?? 'UNKNOWN_ERROR') };
+  }
+  return { message: 'Unknown playback error', code: 'UNKNOWN_ERROR' };
 };
+
 
 export const setPlaybackRate = async (rate: number) => {
   await ensurePlayerSetup();

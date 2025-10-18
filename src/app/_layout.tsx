@@ -15,7 +15,7 @@ export default function RootLayout() {
   useEffect(() => {
     (async () => {
       try {
-        await ensurePlayerSetup(); // ⬅️ call the new initializer
+        await ensurePlayerSetup(); // call the new initializer
       } catch (error) {
         console.error('Failed to setup TrackPlayer:', error);
       }

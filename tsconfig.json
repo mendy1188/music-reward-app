@@ -8,7 +8,7 @@
     "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
     "jsx": "react-native",
-    "types": ["react", "react-native"]
+    "types": ["jest", "react", "react-native"]
   },
   "include": ["src", "app", "index.ts", "index.tsx"]
 }

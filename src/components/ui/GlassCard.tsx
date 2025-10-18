@@ -67,6 +67,8 @@ interface GlassButtonProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   variant?: 'primary' | 'secondary';
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export const GlassButton: React.FC<GlassButtonProps> = ({
@@ -77,6 +79,8 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   style,
   textStyle,
   variant = 'primary',
+  accessibilityLabel,
+  accessibilityHint,
 }) => {
   const gradientColors = variant === 'primary' 
     ? THEME.glass.gradientColors.primary
@@ -92,6 +96,9 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
         disabled={disabled || loading}
         style={styles.buttonContent}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel || title}
+        accessibilityHint={accessibilityHint || title}
       >
         {loading ? (
           <ActivityIndicator color={THEME.colors.text.primary} size="small" />
