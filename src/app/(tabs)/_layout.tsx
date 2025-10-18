@@ -1,4 +1,3 @@
-// Tab layout for main navigation
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { THEME } from '../../constants/theme';

@@ -22,6 +22,7 @@ export default function RootLayout() {
     })();
   }, []);
 
+  //Used this to manually clear persisted keys
   // useEffect(() => {
   //   (async () => {
   //     // 1) clear both persisted keys

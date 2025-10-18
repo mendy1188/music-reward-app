@@ -195,7 +195,6 @@ export const useMusicStore = create<MusicStore>()(
   )
 );
 
-// Selectors
 export const selectChallenges = (s: MusicStore) => s.challenges;
 export const selectCurrentTrack = (s: MusicStore) => s.currentTrack;
 export const selectIsPlaying = (s: MusicStore) => s.isPlaying;

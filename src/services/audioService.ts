@@ -106,7 +106,7 @@ export const setPlaybackRate = async (rate: number) => {
 
 export const setPlayerVolume = async (vol: number) => {
   await ensurePlayerSetup();
-  // TrackPlayer.setVolume exists; if unsupported on some platforms, silently ignore errors || May be better implementation in the feature
+  // TrackPlayer.setVolume exists; if unsupported on some platforms, silently ignore errors || May be better implementation in the future
   try { await TrackPlayer.setVolume(vol); } catch {}
 };
 

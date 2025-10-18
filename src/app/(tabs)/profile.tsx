@@ -1,4 +1,3 @@
-// Profile screen - User progress and stats
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { GlassCard } from '../../components/ui/GlassCard';

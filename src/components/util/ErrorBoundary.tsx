@@ -8,7 +8,6 @@ export class ErrorBoundary extends Component<Props, State> {
   // mark the class field as overriding the base class property
   override state: Readonly<State> = { hasError: false };
 
-  // static lifecycle works without override (TS doesn't require it here)
   static getDerivedStateFromError(_: unknown): State {
     return { hasError: true };
   }

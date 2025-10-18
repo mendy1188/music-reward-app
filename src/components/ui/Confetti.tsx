@@ -1,4 +1,3 @@
-// src/components/ui/Confetti.tsx
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, View, StyleSheet, Dimensions } from 'react-native';
 

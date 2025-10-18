@@ -15,8 +15,8 @@ import { PLAYBACK_RULES as RULES } from '../../../constants/rules';
 import { useMusicPlayer } from '../../../hooks/useMusicPlayer';
 import { useMusicStore, selectChallenges, selectCurrentTrack } from '../../../stores/musicStore';
 import AudioEqualizer from '../../../components/ui/AudioEqualizer';
+
 export default function ChallengeDetail() {
-    const [disableButton, setDisableButton] = useState<boolean>(false);
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
 

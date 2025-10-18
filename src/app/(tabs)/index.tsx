@@ -1,4 +1,3 @@
-// Home screen - Challenge list (Expo Router)
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Animated } from 'react-native';
 import { router } from 'expo-router';
@@ -12,9 +11,7 @@ import type { MusicChallenge } from '../../types';
 export default function HomeScreen() {
   const challenges = useMusicStore(selectChallenges);
   const currentTrack = useMusicStore(selectCurrentTrack);
-  //const isPlaying = useMusicStore(selectIsPlaying);
   const setCurrentTrack = useMusicStore(s => s.setCurrentTrack);
-  //const { play } = useMusicPlayer();
   const { isPlaying, play } = useMusicPlayer();
 
   const currentChallenge = useMemo(
@@ -28,7 +25,6 @@ export default function HomeScreen() {
     return !currentChallenge.completed && p < (RULES.COMPLETION_THRESHOLD_PCT ?? 90);
   }, [currentChallenge]);
 
-  // toast
   const [showBlockToast, setShowBlockToast] = useState(false);
   const toastAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -53,7 +49,7 @@ export default function HomeScreen() {
     }
   };
 
-  //open card should reopen player if it's the current track OR completed
+  //open card should reopen player if it's the current track OR completed: I don't think it's needed now after implementing Challenge Detail
   const handleOpenCard = (challenge: MusicChallenge) => {
     const isCurrent = challenge.id === currentTrack?.id;
     if (isCurrent || challenge.completed) {

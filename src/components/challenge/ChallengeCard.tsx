@@ -46,17 +46,16 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
     return 'Play Challenge';
   };
 
-  const handleCardPress = () => {
-    // allow opening when this is the current track OR the challenge is completed
-    if (isCurrentTrack || challenge.completed) {
-      onOpenCard?.(challenge);
-    }
-    // else: noop (list screen will also show a toast if another challenge is in progress)
-  };
+  // const handleCardPress = () => {
+  //   // allow opening when this is the current track OR the challenge is completed
+  //   if (isCurrentTrack || challenge.completed) {
+  //     onOpenCard?.(challenge);
+  //   }
+  //   // else: noop (list screen will also show a toast if another challenge is in progress)
+  // };
 
   return (
     <Pressable
-      //onPress={handleCardPress}
       onPress={() => router.push(`/(modals)/challenge/${challenge.id}`)}
         disabled={
           isCurrentTrack &&  isPlaying

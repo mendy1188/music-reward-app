@@ -1,4 +1,3 @@
-// Modal layout for player and other modals
 import { Stack } from 'expo-router';
 import { THEME } from '../../constants/theme';
 
@@ -24,8 +23,6 @@ export default function ModalLayout() {
         name="challenge/[id]"
         options={{
           title: 'Challenge',
-          // If you want a slightly taller, sheet-y look:
-          // contentStyle: { borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
         }}
       />
     </Stack>

@@ -75,7 +75,6 @@ const AudioEqualizer: React.FC<Props> = ({
       loopsRef.current.forEach((a) => a.stop());
       loopsRef.current = [];
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, bars, idlePct]);
 
   return (

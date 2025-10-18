@@ -19,7 +19,7 @@ export const PLAYBACK_RULES = {
 
 	/** Playback-rate penalties (applied once per completion using the highest rate used) */
 	RATE_PENALTY_PCT: {
-		1.25: 0.05, // -5%
-		2.0: 0.15, // -15%
+		1.25: 0.05, 
+		2.0: 0.15,
 	} as const,
 } as const;
