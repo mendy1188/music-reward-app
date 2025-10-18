@@ -196,7 +196,7 @@ export default function ChallengeDetail() {
 
                 {/* Actions */}
                 <GlassCard style={styles.card}>
-                    <AudioEqualizer playing={isPlaying} height={48} />
+                    <AudioEqualizer playing={isPlaying} isCurrentTrack={currentTrack?.id === challenge.id} height={48} />
                     <View style={styles.row}>
                         <GlassButton
                             title={

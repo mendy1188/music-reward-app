@@ -4,16 +4,18 @@ import { THEME } from '../../constants/theme';
 
 type Props = {
   playing: boolean;
-  height?: number;         // total visualizer height
-  barCount?: number;       // number of bars
-  barWidth?: number;       // px
-  gap?: number;            // px between bars
-  color?: string;          // bar color
-  idlePct?: number;        // 0..1 idle height pct
+  isCurrentTrack?: boolean;   // ← optional, defaults to false
+  height?: number;
+  barCount?: number;
+  barWidth?: number;
+  gap?: number;
+  color?: string;
+  idlePct?: number;
 };
 
 const AudioEqualizer: React.FC<Props> = ({
   playing,
+  isCurrentTrack = false,          // ← default
   height = 48,
   barCount = 44,
   barWidth = 4,
@@ -21,34 +23,38 @@ const AudioEqualizer: React.FC<Props> = ({
   color = THEME.colors.secondary,
   idlePct = 0.18,
 }) => {
-  // one Animated.Value per bar (0..1)
   const bars = useMemo(
     () => Array.from({ length: barCount }, () => new Animated.Value(idlePct)),
     [barCount, idlePct]
   );
-
   const loopsRef = useRef<Animated.CompositeAnimation[]>([]);
 
-  // start/stop animation based on `playing`
+  // ✅ animate only when this visualizer represents the current track AND playback is running
+  const active = playing && isCurrentTrack;
+
   useEffect(() => {
     // stop any previous loops
     loopsRef.current.forEach((a) => a.stop());
     loopsRef.current = [];
 
-    if (!playing) {
+    if (!active) {
       // settle to idle height
       bars.forEach((v) => {
-        Animated.timing(v, { toValue: idlePct, duration: 240, useNativeDriver: false }).start();
+        Animated.timing(v, {
+          toValue: idlePct,
+          duration: 240,
+          useNativeDriver: false,
+        }).start();
       });
       return;
     }
 
-    // when playing: each bar loops between random heights for a lively look
+    // when active: each bar loops between random heights
     bars.forEach((v, i) => {
       const animateOne = () =>
         Animated.sequence([
           Animated.timing(v, {
-            toValue: Math.random() * 0.9 + 0.1, // 0.1..1.0
+            toValue: Math.random() * 0.9 + 0.1,
             duration: 220 + Math.random() * 220,
             useNativeDriver: false,
           }),
@@ -60,11 +66,7 @@ const AudioEqualizer: React.FC<Props> = ({
         ]);
 
       const loop = Animated.loop(
-        Animated.sequence([
-          // small initial stagger so bars aren’t in sync
-          Animated.delay(i * 18),
-          animateOne(),
-        ])
+        Animated.sequence([Animated.delay(i * 18), animateOne()])
       );
 
       loopsRef.current.push(loop);
@@ -75,7 +77,8 @@ const AudioEqualizer: React.FC<Props> = ({
       loopsRef.current.forEach((a) => a.stop());
       loopsRef.current = [];
     };
-  }, [playing, bars, idlePct]);
+  }, [active, bars, idlePct]);
+
 
   return (
     <View

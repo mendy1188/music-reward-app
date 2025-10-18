@@ -145,7 +145,7 @@ export default function PlayerModal() {
         {/* Progress Section */}
         <GlassCard style={styles.progressCard}>
           <Text style={styles.progressLabel}>Listening Progress</Text>
-          <AudioEqualizer playing={isPlaying} height={48} />
+          <AudioEqualizer playing={isPlaying} isCurrentTrack={true} height={48} />
 
           {/* Progress Bar */}
           <TouchableOpacity
