@@ -1,4 +1,5 @@
 import React from 'react';
+import { useRouter } from 'expo-router';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { GlassCard, GlassButton } from '../ui/GlassCard';
 import { THEME } from '../../constants/theme';
@@ -21,6 +22,8 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
   isPlaying = false,
   disablePlay = false,
 }) => {
+  const router = useRouter();
+
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -44,7 +47,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
   };
 
   const handleCardPress = () => {
-    // ✅ allow opening when this is the current track OR the challenge is completed
+    // allow opening when this is the current track OR the challenge is completed
     if (isCurrentTrack || challenge.completed) {
       onOpenCard?.(challenge);
     }
@@ -53,7 +56,11 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
 
   return (
     <Pressable
-      onPress={handleCardPress}
+      //onPress={handleCardPress}
+      onPress={() => router.push(`/(modals)/challenge/${challenge.id}`)}
+        disabled={
+          isCurrentTrack &&  isPlaying
+      }
       accessibilityRole="button"
       accessibilityLabel={
         isCurrentTrack || challenge.completed

@@ -1,14 +1,10 @@
-// Zustand store for user data and points
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface UserStore {
-  // State
   totalPoints: number;
   completedChallenges: string[];
-  
-  // Actions
   addPoints: (points: number) => void;
   completeChallenge: (challengeId: string, awardPoints?: number) => void;
   resetProgress: () => void;
@@ -17,49 +13,43 @@ interface UserStore {
 export const useUserStore = create<UserStore>()(
   persist(
     (set, get) => ({
-      // Initial state
       totalPoints: 0,
       completedChallenges: [],
 
-      // Actions
-      addPoints: (points: number) => {
-        set((state) => ({
-          totalPoints: state.totalPoints + points,
-        }));
-      },
+      addPoints: (points) =>
+        set((s) => ({ totalPoints: s.totalPoints + (Number(points) || 0) })),
 
       completeChallenge: (challengeId, awardPoints) =>
-        set((state) => {
-          if (state.completedChallenges.includes(challengeId)) return state;
+        set((s) => {
+          if (s.completedChallenges.includes(challengeId)) return s;
           return {
-            completedChallenges: [...state.completedChallenges, challengeId],
-            totalPoints: awardPoints ? state.totalPoints + awardPoints : state.totalPoints,
+            completedChallenges: [...s.completedChallenges, challengeId],
+            totalPoints: typeof awardPoints === 'number' ? s.totalPoints + awardPoints : s.totalPoints,
           };
         }),
 
-      resetProgress: () => {
-        set({
-          totalPoints: 0,
-          completedChallenges: [],
-        });
-      },
+      resetProgress: () => set({ totalPoints: 0, completedChallenges: [] }),
     }),
     {
       name: 'user-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2, // bump when shape changes
-      migrate: (persisted, fromVersion) => {
-        // Safely handle older shapes
-        if (!persisted) return { totalPoints: 0, completedChallenges: [] };
-        if (fromVersion < 2) {
-          // add future fields with defaults if you add them later
-        }
-        return persisted;
+      version: 2,
+      migrate: (persisted: any, fromVersion) => {
+        const base = { totalPoints: 0, completedChallenges: [] as string[] };
+        if (!persisted || typeof persisted !== 'object') return base;
+
+        const p: any = { ...persisted };
+        p.totalPoints = Math.max(0, Number(p.totalPoints) || 0);
+        p.completedChallenges = Array.isArray(p.completedChallenges)
+          ? p.completedChallenges.filter((x: any) => typeof x === 'string' && x)
+          : [];
+
+        // future migrations here, e.g. if (fromVersion < 3) { ... }
+        return { ...base, ...p };
       },
     }
   )
 );
 
-// Selector functions
-export const selectTotalPoints = (state: UserStore) => state.totalPoints;
-export const selectCompletedChallenges = (state: UserStore) => state.completedChallenges;
+export const selectTotalPoints = (s: UserStore) => s.totalPoints;
+export const selectCompletedChallenges = (s: UserStore) => s.completedChallenges;

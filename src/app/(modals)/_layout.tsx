@@ -20,6 +20,14 @@ export default function ModalLayout() {
           headerBackTitle: 'Close',
         }}
       />
+      <Stack.Screen
+        name="challenge/[id]"
+        options={{
+          title: 'Challenge',
+          // If you want a slightly taller, sheet-y look:
+          // contentStyle: { borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
+        }}
+      />
     </Stack>
   );
 }

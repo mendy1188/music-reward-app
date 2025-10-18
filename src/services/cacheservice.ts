@@ -1,59 +1,31 @@
-// src/services/cacheservice.ts
-// Stream-first caching: first play uses remote URL, cache happens in background.
-// Subsequent plays use the cached file:// URI.
-import * as FS from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system/legacy';
 
-const CACHE_DIR = `${FS.cacheDirectory}audio-cache/`;
-const inflight: Record<string, Promise<string>> = {};
+const CACHE_DIR = `${FileSystem.documentDirectory}audio-cache/`;
 
 async function ensureDir() {
-  try {
-    await FS.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
-  } catch {/* already exists */}
+  try { await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true }); } catch {}
 }
 
-function localPathFor(remoteUrl: string) {
-  return `${CACHE_DIR}${encodeURIComponent(remoteUrl)}.mp3`;
-}
-
-/** Quick check: if cached exists, return file:// path, else null */
-export async function peekCached(remoteUrl: string): Promise<string | null> {
+export async function getCachedIfExists(remoteUrl: string): Promise<string | null> {
   await ensureDir();
-  const path = localPathFor(remoteUrl);
-  const info = await FS.getInfoAsync(path);
-  return info.exists ? path : null;
-}
-
-/** Start caching in background (de-duped). Returns file path when finished. */
-export function warmCache(remoteUrl: string): Promise<string> {
-  const key = localPathFor(remoteUrl);
-  if (!inflight[key]) {
-    inflight[key] = (async () => {
-      await ensureDir();
-      // If it finished while we were setting up, bail early
-      const existing = await FS.getInfoAsync(key);
-      if (existing.exists) return key;
-
-      const { uri } = await FS.downloadAsync(remoteUrl, key);
-      return uri || key;
-    })().finally(() => {
-      // allow future refresh if needed
-      delete inflight[key];
-    });
-  }
-  return inflight[key];
+  const name = encodeURIComponent(remoteUrl) + '.mp3';
+  const local = CACHE_DIR + name;
+  const info = await FileSystem.getInfoAsync(local);
+  return (info && (info as any).exists) ? local : null;
 }
 
 /**
- * Get a URI you can feed to TrackPlayer:
- * - If cached exists → return file:// path.
- * - If not → return remoteUrl immediately and start background caching.
+ * Fire-and-forget cache. Returns immediately; caller can keep using remote URL.
  */
-export async function getPlayableUri(remoteUrl: string): Promise<string> {
-  const cached = await peekCached(remoteUrl);
-  if (cached) return cached;
-
-  // kick off background cache, but don't await it
-  warmCache(remoteUrl).catch(() => {});
-  return remoteUrl; // stream immediately
+export async function cacheInBackground(remoteUrl: string): Promise<void> {
+  try {
+    await ensureDir();
+    const name = encodeURIComponent(remoteUrl) + '.mp3';
+    const local = CACHE_DIR + name;
+    const info = await FileSystem.getInfoAsync(local);
+    if (info && (info as any).exists) return; // already cached
+    await FileSystem.downloadAsync(remoteUrl, local);
+  } catch {
+    // silent: caching is best-effort
+  }
 }

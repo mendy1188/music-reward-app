@@ -1,4 +1,3 @@
-// src/hooks/useMusicPlayer.ts
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import TrackPlayer, {
   State,
@@ -10,8 +9,7 @@ import TrackPlayer, {
 import { useMusicStore, selectCurrentTrack } from '../stores/musicStore';
 import { useUserStore, selectCompletedChallenges } from '../stores/userStore';
 import type { MusicChallenge, UseMusicPlayerReturn } from '../types';
-import { ensurePlayerSetup, setPlaybackRate, setPlayerVolume } from '../services/audioService';
-import { getPlayableUri } from '../services/cacheservice';
+import { ensurePlayerSetup, setPlaybackRate, setPlayerVolume, resolvePlayableUrl } from '../services/audioService';
 import { saveCompletionServer } from '../services/syncService';
 import { PLAYBACK_RULES as RULES } from '../constants/rules';
 
@@ -62,6 +60,15 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
       } catch {
         activeTrackIdRef.current = null;
       }
+    }
+  });
+
+  useTrackPlayerEvents([Event.RemoteDuck], (e: any) => {
+    // iOS/Android audio focus changes (calls, Siri, other apps)
+    if (e?.paused === true) {
+      TrackPlayer.pause().catch(() => {});
+    } else if (e?.paused === false) {
+      TrackPlayer.play().catch(() => {});
     }
   });
 
@@ -231,11 +238,11 @@ export const useMusicPlayer = (): UseMusicPlayerReturn => {
       rateRef.current = 1;
       peakRateRef.current = 1;
 
-      const uri = await getPlayableUri(track.audioUrl);
+      const url = await resolvePlayableUrl(track.audioUrl);
       await TrackPlayer.reset();
       await TrackPlayer.add({
         id: track.id,
-        url: uri,
+        url: url,
         title: track.title,
         artist: track.artist,
         duration: track.duration,

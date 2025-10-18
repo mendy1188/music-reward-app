@@ -4,6 +4,7 @@ import TrackPlayer, {
   Capability,
   AppKilledPlaybackBehavior,
 } from 'react-native-track-player';
+import { getCachedIfExists, cacheInBackground } from './cacheservice';
 
 let setupPromise: Promise<void> | null = null;
 
@@ -108,3 +109,10 @@ export const setPlayerVolume = async (vol: number) => {
   // TrackPlayer.setVolume exists; if unsupported on some platforms, silently ignore errors || May be better implementation in the feature
   try { await TrackPlayer.setVolume(vol); } catch {}
 };
+
+export const resolvePlayableUrl = async(remoteUrl: string): Promise<string> => {
+  const cached = await getCachedIfExists(remoteUrl);
+  if (cached) return cached;      // use cache if available
+  cacheInBackground(remoteUrl);   // kick off caching, don’t await
+  return remoteUrl;               // stream remote now
+}

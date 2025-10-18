@@ -4,66 +4,59 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MusicChallenge } from '../types';
 import { SAMPLE_CHALLENGES } from '../constants/theme';
 
-type DeductionInfo = { pointsDeducted: number; forwardSeeks: number, peakRate?: number | undefined};
+type DeductionInfo = { pointsDeducted: number; forwardSeeks: number; peakRate?: number };
 
 interface MusicStore {
-  // Ephemeral UI/catalog state (NOT persisted directly)
+  // Ephemeral UI/catalog (not persisted)
   challenges: MusicChallenge[];
   currentTrack: MusicChallenge | null;
   isPlaying: boolean;
   currentPosition: number;
 
-  // Persisted user progress (IDs) + persisted per-challenge deductions
+  // Persisted slices
   completedChallenges: string[];
-  // NEW: persisted deductions by challenge ID
   deductionsById: Record<string, DeductionInfo>;
 
   // Actions
-  loadChallenges: () => void; // rebuild from SAMPLE_CHALLENGES + completed + deductions map
+  loadChallenges: () => void;
   setCurrentTrack: (track: MusicChallenge | null) => void;
   updateProgress: (challengeId: string, progress: number) => void;
-
-  // Accept optional deduction info on complete
   markChallengeComplete: (
     challengeId: string,
-    opts?: { pointsDeducted?: number; forwardSeeks?: number, peakRate?: number }
+    opts?: { pointsDeducted?: number; forwardSeeks?: number; peakRate?: number }
   ) => void;
-
   setIsPlaying: (playing: boolean) => void;
   setCurrentPosition: (position: number) => void;
-
-  // Dev/helper
   resetProgress: () => Promise<void>;
 }
 
-// Build ephemeral list from catalog + completed IDs + persisted deductions
 const buildChallenges = (
   completedIds: string[],
   deductionsById: Record<string, DeductionInfo>
 ): MusicChallenge[] =>
-  SAMPLE_CHALLENGES.map((c) => {
-    const completed = completedIds.includes(c.id);
+  SAMPLE_CHALLENGES?.map((c) => {
     const d = deductionsById[c.id];
+    const completed = completedIds.includes(c.id);
     return {
       ...c,
       completed,
       progress: completed ? 100 : 0,
       pointsDeducted: d?.pointsDeducted ?? 0,
       forwardSeeks: d?.forwardSeeks ?? 0,
-      peakRate: d?.peakRate ?? 0,
+      peakRate: d?.peakRate,
     };
-  });
+  }) as any; // as any: because it keeps yelling
 
 export const useMusicStore = create<MusicStore>()(
   persist(
     (set, get) => ({
-      // Ephemeral (catalog + ui)
+      // Ephemeral
       challenges: buildChallenges([], {}),
       currentTrack: null,
       isPlaying: false,
       currentPosition: 0,
 
-      // Persisted slices
+      // Persisted
       completedChallenges: [],
       deductionsById: {},
 
@@ -85,22 +78,29 @@ export const useMusicStore = create<MusicStore>()(
       },
 
       markChallengeComplete: (challengeId, opts) => {
-        // state: any => not sure why 'untype state' was yelling
+        //any: this has to be looked at for right type
         set((state: any) => {
           const already = state.completedChallenges.includes(challengeId);
           const nextCompleted = already
             ? state.completedChallenges
             : [...state.completedChallenges, challengeId];
 
-          // persist/merge the deduction for this challenge
-          const prevDeduction = state.deductionsById[challengeId] ?? { pointsDeducted: 0, forwardSeeks: 0, peakRate: undefined };
-          const nextDeduction: DeductionInfo = {
-            pointsDeducted: opts?.pointsDeducted ?? prevDeduction.pointsDeducted,
-            forwardSeeks: opts?.forwardSeeks ?? prevDeduction.forwardSeeks,
-            peakRate: opts?.peakRate ?? prevDeduction.peakRate,
+          const prev = state.deductionsById[challengeId] ?? {
+            pointsDeducted: 0,
+            forwardSeeks: 0,
+            peakRate: undefined as number | undefined,
+          };
+          const next: DeductionInfo = {
+            pointsDeducted: opts?.pointsDeducted ?? prev.pointsDeducted,
+            forwardSeeks: opts?.forwardSeeks ?? prev.forwardSeeks,
+            peakRate:
+              typeof opts?.peakRate === 'number'
+                ? opts?.peakRate
+                : typeof prev.peakRate === 'number'
+                ? prev.peakRate
+                : undefined,
           };
 
-          // reflect completion + deduction into ephemeral array
           const nextChallenges = state.challenges.map((ch: any) =>
             ch.id === challengeId
               ? {
@@ -108,33 +108,27 @@ export const useMusicStore = create<MusicStore>()(
                   completed: true,
                   progress: 100,
                   completedAt: new Date().toISOString(),
-                  pointsDeducted: nextDeduction.pointsDeducted,
-                  forwardSeeks: nextDeduction.forwardSeeks,
-                  peakRate: nextDeduction.peakRate,
+                  pointsDeducted: next.pointsDeducted,
+                  forwardSeeks: next.forwardSeeks,
+                  peakRate: next.peakRate,
                 }
               : ch
           );
 
           return {
             completedChallenges: nextCompleted,
-            deductionsById: {
-              ...state.deductionsById,
-              [challengeId]: nextDeduction,
-            },
+            deductionsById: { ...state.deductionsById, [challengeId]: next },
             challenges: nextChallenges,
           };
         });
       },
 
       setIsPlaying: (playing) =>
-        set((state) =>
-          state.isPlaying === playing ? state : { isPlaying: playing }
-        ),
+        set((state) => (state.isPlaying === playing ? state : { isPlaying: playing })),
 
       setCurrentPosition: (position) => set({ currentPosition: position }),
 
       resetProgress: async () => {
-        // Clear persisted progress + deductions; rebuild ephemeral list
         set({ completedChallenges: [], deductionsById: {} });
         set({ challenges: buildChallenges([], {}) });
       },
@@ -142,27 +136,59 @@ export const useMusicStore = create<MusicStore>()(
     {
       name: 'music-store',
       storage: createJSONStorage(() => AsyncStorage),
+
+      // bump this when persisted shape changes
       version: 3,
+
+      // Persist ONLY these keys
       partialize: (state) => ({
         completedChallenges: state.completedChallenges,
         deductionsById: state.deductionsById,
       }),
-      migrate: (persisted: any, from) => {
-        if (!persisted) return { completedChallenges: [], deductionsById: {} };
-        if (from < 3) {
-          // ...
+
+      // Migrate only the persisted slice; sanitize shapes
+      migrate: (persisted: any, fromVersion) => {
+        const base = { completedChallenges: [] as string[], deductionsById: {} as Record<string, DeductionInfo> };
+
+        if (!persisted || typeof persisted !== 'object') return base;
+
+        const p: any = { ...persisted };
+
+        // ensure arrays/objects
+        p.completedChallenges = Array.isArray(p.completedChallenges)
+          ? p.completedChallenges.filter((x: any) => typeof x === 'string' && x)
+          : [];
+
+        if (!p.deductionsById || typeof p.deductionsById !== 'object') {
+          p.deductionsById = {};
         }
-        return persisted;
+
+        // backfill for pre-v3
+        if (fromVersion < 3) {
+          p.deductionsById = p.deductionsById || {};
+        }
+
+        // sanitize each deduction entry
+        for (const id of Object.keys(p.deductionsById)) {
+          const d = p.deductionsById[id] ?? {};
+          p.deductionsById[id] = {
+            pointsDeducted: Math.max(0, Number(d.pointsDeducted) || 0),
+            forwardSeeks: Math.max(0, Number(d.forwardSeeks) || 0),
+            peakRate: typeof d.peakRate === 'number' ? d.peakRate : undefined,
+          };
+        }
+
+        return { ...base, ...p };
       },
 
-      onRehydrateStorage: () => (state) => {
-        if (!state) return;
+      // After rehydrate, rebuild ephemerals from the persisted slice
+      onRehydrateStorage: () => (state, error) => {
+        if (error) return;
+        // next tick to avoid set during rehydrate warning
         setTimeout(() => {
-          const completed = state.completedChallenges ?? [];
-          const deductions = state.deductionsById ?? {};
-          useMusicStore.setState({
-            challenges: buildChallenges(completed, deductions),
-          });
+          try {
+            useMusicStore.getState().loadChallenges();
+          } catch {}
         }, 0);
       },
     }

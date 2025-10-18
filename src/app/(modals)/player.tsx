@@ -17,11 +17,24 @@ import AudioEqualizer from '../../components/ui/AudioEqualizer';
 import { Confetti } from '../../components/ui/Confetti';
 
 export default function PlayerModal() {
-  // —— Toast state (message-based) ——
   const [toastText, setToastText] = useState<string>('');
   const [burst, setBurst] = useState(0);
   const toastAnim = useRef(new Animated.Value(0)).current;
   const hideToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wasCompletedRef = useRef<boolean>(false);
+
+  const {
+    currentTrack,
+    isPlaying,
+    currentPosition,
+    duration,
+    pause,
+    resume,
+    seekTo,
+    setRate,
+    loading,
+    error,
+  } = useMusicPlayer();
 
   const showToast = (msg: string) => {
     if (!msg) return;
@@ -45,18 +58,17 @@ export default function PlayerModal() {
     };
   }, []);
 
-  const {
-    currentTrack,
-    isPlaying,
-    currentPosition,
-    duration,
-    pause,
-    resume,
-    seekTo,
-    setRate,
-    loading,
-    error,
-  } = useMusicPlayer();
+  // when currentTrack just became completed:
+  useEffect(() => {
+    if (!currentTrack) return;
+    const prev = wasCompletedRef.current;
+    const now = !!currentTrack.completed;
+    if (!prev && now) {
+      setBurst((b) => b + 1);
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+    }
+    wasCompletedRef.current = now;
+  }, [currentTrack?.completed]);
 
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
@@ -89,15 +101,6 @@ export default function PlayerModal() {
       resume();
     }
   };
-
-  // when currentTrack just became completed:
-  useEffect(() => {
-    if (!currentTrack) return;
-    if (currentTrack.completed) {
-      setBurst((b) => b + 1);
-      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
-    }
-  }, [currentTrack?.completed]);
 
   if (error) Alert.alert('Playback Error', error);
 
