@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
-  Animated,
+  StyleSheet as RNStyleSheet,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { GlassCard, GlassButton } from '../../components/ui/GlassCard';
@@ -15,13 +15,12 @@ import { THEME } from '../../constants/theme';
 import { PLAYBACK_RULES as RULES } from '../../constants/rules';
 import AudioEqualizer from '../../components/ui/AudioEqualizer';
 import { Confetti } from '../../components/ui/Confetti';
+import Toast, { ToastHandle } from '../../components/ui/Toast';
 
 export default function PlayerModal() {
-  const [toastText, setToastText] = useState<string>('');
   const [burst, setBurst] = useState(0);
-  const toastAnim = useRef(new Animated.Value(0)).current;
-  const hideToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasCompletedRef = useRef<boolean>(false);
+  const toastRef = useRef<ToastHandle>(null);
 
   const {
     currentTrack,
@@ -36,43 +35,23 @@ export default function PlayerModal() {
     error,
   } = useMusicPlayer();
 
-  const showToast = (msg: string) => {
-    if (!msg) return;
-    setToastText(msg);
-    if (hideToastTimer.current) clearTimeout(hideToastTimer.current);
-
-    // fade in
-    Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-
-    // auto hide
-    hideToastTimer.current = setTimeout(() => {
-      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-        setToastText('');
-      });
-    }, 1500);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (hideToastTimer.current) clearTimeout(hideToastTimer.current);
-    };
-  }, []);
-
-  // when currentTrack just became completed:
+  // fire confetti exactly when completion flips to true
   useEffect(() => {
     if (!currentTrack) return;
     const prev = wasCompletedRef.current;
     const now = !!currentTrack.completed;
     if (!prev && now) {
       setBurst((b) => b + 1);
-      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
     }
     wasCompletedRef.current = now;
   }, [currentTrack?.completed]);
 
   const formatTime = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+    const minutes = Math.floor((seconds || 0) / 60);
+    const secs = Math.floor((seconds || 0) % 60);
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -81,15 +60,14 @@ export default function PlayerModal() {
     return (currentPosition / duration) * 100;
   };
 
-  // ——— Seek handler: toast shows skip penalty ———
+  // Seek handler — show skip penalty toast when applicable
   const handleSeek = (percentage: number) => {
     if (!duration) return;
     const newPosition = (percentage / 100) * duration;
 
-    // Only treat as forward seek if beyond threshold
     if (newPosition > currentPosition + (RULES.FORWARD_SEEK_THRESHOLD_SEC || 0)) {
       const pct = Math.round((RULES.FORWARD_SEEK_PENALTY_PCT || 0) * 100);
-      if (pct > 0) showToast(`−${pct}% for skipping forward`);
+      if (pct > 0) toastRef.current?.show(`−${pct}% for skipping forward`, { variant: 'warn' });
     }
     seekTo(newPosition);
   };
@@ -147,7 +125,7 @@ export default function PlayerModal() {
           <Text style={styles.progressLabel}>Listening Progress</Text>
           <AudioEqualizer playing={isPlaying} isCurrentTrack={true} height={48} />
 
-          {/* Progress Bar: Disabled to avoid drag at the moment. Can be worked on later to allow drag */}
+          {/* Progress Bar (disabled tap-seek for now) */}
           <TouchableOpacity
             style={styles.progressTrack}
             onPress={(event) => {
@@ -155,19 +133,14 @@ export default function PlayerModal() {
               const percentage = (locationX / width) * 100;
               handleSeek(percentage);
             }}
-            disabled={true}
+            disabled
             accessible
             accessibilityRole="adjustable"
             accessibilityLabel="Seek in track"
             accessibilityHint="Double tap and hold, then slide left or right to seek"
           >
             <View style={styles.progressBackground}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${getProgress()}%` },
-                ]}
-              />
+              <View style={[styles.progressFill, { width: `${getProgress()}%` }]} />
             </View>
           </TouchableOpacity>
 
@@ -231,13 +204,13 @@ export default function PlayerModal() {
                   const penaltyPct = (RULES.RATE_PENALTY_PCT as Record<number, number>)[r] ?? 0;
                   if (penaltyPct > 0) {
                     const pct = Math.round(penaltyPct * 100);
-                    showToast(`−${pct}% at ${r}× speed`);
+                    toastRef.current?.show(`−${pct}% at ${r}× speed`, { variant: 'warn' });
                   }
                 }}
                 variant="secondary"
                 style={styles.controlButton}
-                accessibilityLabel={`Playback speed ${r}x times`}
-                accessibilityHint={`Playback speed ${r}x times faster than normal playback speed`}
+                accessibilityLabel={`Set playback speed to ${r}x`}
+                accessibilityHint={`Plays ${r} times ${r < 1 ? 'slower' : 'faster'} than normal`}
               />
             ))}
           </View>
@@ -259,47 +232,31 @@ export default function PlayerModal() {
                 },
               ]}
             >
-              {(currentTrack.completed || Math.round(getProgress()) >= 90) ? '✅ Completed' : '🎧 In Progress'}
+              {(currentTrack.completed || Math.round(getProgress()) >= 90)
+                ? '✅ Completed'
+                : '🎧 In Progress'}
             </Text>
             <Text style={styles.challengeProgress}>
-              { currentTrack.completed ? Math.round(currentTrack.progress) : Math.round(getProgress())}% of challenge complete
+              {currentTrack.completed
+                ? Math.round(currentTrack.progress)
+                : Math.round(getProgress())}% of challenge complete
             </Text>
           </View>
         </GlassCard>
 
-        {/* Toast */}
-        {toastText ? (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.toast,
-              {
-                opacity: toastAnim,
-                transform: [
-                  {
-                    translateY: toastAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [24, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <Text style={styles.toastText}>{toastText}</Text>
-          </Animated.View>
-        ) : null}
-
+        {/* Confetti overlay */}
         <View
           pointerEvents="none"
           style={{
-            ...StyleSheet.absoluteFillObject,
+            ...RNStyleSheet.absoluteFillObject,
             zIndex: 9999,
             elevation: 9999,
           }}
         >
           <Confetti trigger={burst} />
         </View>
+
+        <Toast ref={toastRef} position="bottom" />
       </View>
     </SafeAreaView>
   );
@@ -341,16 +298,4 @@ const styles = StyleSheet.create({
   challengeInfo: { alignItems: 'center' },
   challengeStatus: { fontSize: THEME.fonts.sizes.lg, fontWeight: 'bold', marginBottom: THEME.spacing.xs },
   challengeProgress: { fontSize: THEME.fonts.sizes.sm, color: THEME.colors.text.secondary },
-  toast: {
-    position: 'absolute',
-    bottom: 24,
-    left: 16,
-    right: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    alignItems: 'center',
-  },
-  toastText: { color: '#fff', fontSize: THEME.fonts.sizes.sm, fontWeight: '600' },
 });

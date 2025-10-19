@@ -15,8 +15,11 @@ import { PLAYBACK_RULES as RULES } from '../../../constants/rules';
 import { useMusicPlayer } from '../../../hooks/useMusicPlayer';
 import { useMusicStore, selectChallenges, selectCurrentTrack } from '../../../stores/musicStore';
 import AudioEqualizer from '../../../components/ui/AudioEqualizer';
+import Toast, { ToastHandle } from '../../../components/ui/Toast';
 
 export default function ChallengeDetail() {
+    const toastRef = useRef<ToastHandle>(null);
+
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
 
@@ -46,20 +49,6 @@ export default function ChallengeDetail() {
         const p = challenge.progress ?? 0;
         return !challenge.completed && p < (RULES.COMPLETION_THRESHOLD_PCT ?? 90);
       }, [challenge]);
-
-    // Simple toast for local UX
-    const [toast, setToast] = useState<string>('');
-    const toastAnim = useRef(new Animated.Value(0)).current;
-    const showToast = (msg: string) => {
-        setToast(msg);
-        Animated.timing(toastAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start(() => {
-            setTimeout(() => {
-                Animated.timing(toastAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
-                    setToast('');
-                });
-            }, 1400);
-        });
-    };
 
     if (!challenge) {
         return (
@@ -91,7 +80,7 @@ export default function ChallengeDetail() {
             currentTrackFromStore.id !== challenge.id &&
             (isPlaying || (currentTrack?.progress ?? 0) < RULES.COMPLETION_THRESHOLD_PCT)
         ) {
-            showToast('Finish the current challenge first');
+            toastRef.current?.show('Finish the current challenge first', { variant: 'warn' });
             return;
         }
 
@@ -224,28 +213,7 @@ export default function ChallengeDetail() {
                 </GlassCard>
             </View>
 
-            {/* Toast */}
-            {toast ? (
-                <Animated.View
-                    pointerEvents="none"
-                    style={[
-                        styles.toast,
-                        {
-                            opacity: toastAnim,
-                            transform: [
-                                {
-                                    translateY: toastAnim.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [24, 0],
-                                    }),
-                                },
-                            ],
-                        },
-                    ]}
-                >
-                    <Text style={styles.toastText}>{toast}</Text>
-                </Animated.View>
-            ) : null}
+            <Toast ref={toastRef} position="bottom" />
         </SafeAreaView>
     );
 }
@@ -287,19 +255,6 @@ const styles = StyleSheet.create({
     row: { flexDirection: 'row', gap: THEME.spacing.sm, marginTop: 8 },
 
     hint: { color: THEME.colors.text.tertiary, marginTop: THEME.spacing.sm, textAlign: 'center', fontSize: THEME.fonts.sizes.sm },
-
-    toast: {
-        position: 'absolute',
-        bottom: 24,
-        left: 16,
-        right: 16,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        backgroundColor: 'rgba(0,0,0,0.75)',
-        alignItems: 'center',
-    },
-    toastText: { color: '#fff', fontSize: THEME.fonts.sizes.sm, fontWeight: '600' },
 
     notFound: { color: THEME.colors.text.primary, fontWeight: '700', marginBottom: THEME.spacing.sm },
 });
